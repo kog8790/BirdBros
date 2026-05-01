@@ -1,0 +1,20 @@
+Bird Bros Storyboard | session_2026-05-01_08-40-36
+
+Started: 2026-05-01T08:40:36
+Ended: 2026-05-01T08:40:40
+
+Task Labels:
+- subject_label: non-human animal
+- object_label: man-made litter or trash
+- target_zone_label: trash receptacle
+- action_label: depositing
+
+- [2026-05-01T08:40:36] session_started: Deposit event contact sheet created after object motion cleared. (image: 01_session_started_frame.jpg)
+- [2026-05-01T08:40:36] deposit_event_contact_sheet_ready: Contact sheet built from selected pre-event and event frames. (image: 02_deposit_event_contact_sheet_ready_frame.jpg)
+- [2026-05-01T08:40:39] deposit_event_analysis_complete: subjectPresent=True, subjectLabel=non-human animal, objectPresent=True, objectLabel=man-made litter or trash, actionObserved=True, targetZoneVisible=True, rewardable=True, bestFrameIndex=9, reason=The sequence shows a bird depositing litter into the trash receptacle, fulfilling all criteria for a rewardable event. (image: 04_deposit_event_analysis_complete_frame.jpg)
+- [2026-05-01T08:40:40] final_outcome: Reward triggered: True. Reason: The sequence shows a bird depositing litter into the trash receptacle, fulfilling all criteria for a rewardable event.. bestFrameIndex=9 (image: 06_final_outcome_frame.jpg)
+
+Narrative Summary:
+The session ended with reward.
+
+Final Outcome: rewarded=True | label=man-made litter or trash

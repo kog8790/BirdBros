@@ -1,0 +1,47 @@
+{
+  "capture_region": {
+    "left": 100,
+    "top": 100,
+    "width": 900,
+    "height": 700
+  },
+  "subject_roi": {
+    "x_pct": 0.5,
+    "y_pct": 0.14285714285714285,
+    "w_pct": 0.5555555555555556,
+    "h_pct": 0.42857142857142855
+  },
+  "object_roi": {
+    "x_pct": 0.6166666666666667,
+    "y_pct": 0.3171428571428571,
+    "w_pct": 0.37,
+    "h_pct": 0.15857142857142856
+  },
+  "motion": {
+    "min_area": 1500
+  },
+  "display": {
+    "show_grid": false,
+    "show_coords": false,
+    "show_capture_border": true
+  },
+  "reward_action": {
+    "mode": "mouse_click",
+    "x": 735,
+    "y": 586,
+    "clicks": 3,
+    "interval": 0.098,
+    "move_duration": 0.0,
+    "keys": [
+      "command",
+      "space"
+    ],
+    "command": "",
+    "url": "",
+    "method": "POST",
+    "timeout": 5
+  },
+  "no_reward_action": {
+    "mode": "debug_popup"
+  }
+}
