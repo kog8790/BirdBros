@@ -10,25 +10,14 @@
 		8D1905822F8A7AC400ED2854 /* overlay_window.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = overlay_window.py; sourceTree = "<group>"; };
 		8D1905832F8A8C2E00ED2854 /* config_manager.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = config_manager.py; sourceTree = "<group>"; };
 		8D1905842F8A94FC00ED2854 /* control_panel.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = control_panel.py; sourceTree = "<group>"; };
-		8D3666C32F7BFFCF004A585C /* test.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = test.py; sourceTree = "<group>"; };
-		8D3666C52F7D538E004A585C /* motion_triggered_buffer.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = motion_triggered_buffer.py; sourceTree = "<group>"; };
 		8D7EC5422F95A041003FC384 /* session_storyboard.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = session_storyboard.py; sourceTree = "<group>"; };
-		8D7EC5432F9FEC7C003FC384 /* main.old.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = main.old.py; sourceTree = "<group>"; };
 		8D7EC5442F9FF317003FC384 /* event_session.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = event_session.py; sourceTree = "<group>"; };
 		8D7EC5452FA0D0D9003FC384 /* motion_object_tracker.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = motion_object_tracker.py; sourceTree = "<group>"; };
 		8D7EC5462FA0D13C003FC384 /* event_session_manager.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = event_session_manager.py; sourceTree = "<group>"; };
 		8D7EC5472FA238A8003FC384 /* contact_sheet_builder.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = contact_sheet_builder.py; sourceTree = "<group>"; };
-		8D7EC5482FA23C9F003FC384 /* main.vintage.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = main.vintage.py; sourceTree = "<group>"; };
-		8D7EC5492FA2414A003FC384 /* event_session.vintage.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = event_session.vintage.py; sourceTree = "<group>"; };
-		8D7EC54A2FA242A7003FC384 /* event_session_manager.vintage.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = event_session_manager.vintage.py; sourceTree = "<group>"; };
 		8DA91F7D2F79EE8A0080D5B1 /* bound_box_define.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = bound_box_define.py; sourceTree = "<group>"; };
 		8DA91F7E2F79EEF40080D5B1 /* cam_controller.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = cam_controller.py; sourceTree = "<group>"; };
-		8DA91F7F2F79EF410080D5B1 /* rois.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = rois.py; sourceTree = "<group>"; };
 		8DA91F802F79EFCA0080D5B1 /* bound_box_drawer.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = bound_box_drawer.py; sourceTree = "<group>"; };
-		8DA91F812F79EFEB0080D5B1 /* motion_detector.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = motion_detector.py; sourceTree = "<group>"; };
-		8DA91F832F79F0A30080D5B1 /* subject_session.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = subject_session.py; sourceTree = "<group>"; };
-		8DA91F842F79F0F40080D5B1 /* centroid_calculation.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = centroid_calculation.py; sourceTree = "<group>"; };
-		8DA91F852F79F1DF0080D5B1 /* motion_analysis.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = motion_analysis.py; sourceTree = "<group>"; };
 		8DA91F862F79F2330080D5B1 /* image_subject.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = image_subject.py; sourceTree = "<group>"; };
 		8DA91F872F79F3A70080D5B1 /* image_object.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = image_object.py; sourceTree = "<group>"; };
 		8DA91F882F79F3D80080D5B1 /* vision_api.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = vision_api.py; sourceTree = "<group>"; };
@@ -41,22 +30,13 @@
 		8DA91F752F79EE110080D5B1 = {
 			isa = PBXGroup;
 			children = (
-				8D3666C32F7BFFCF004A585C /* test.py */,
 				8DA91F7D2F79EE8A0080D5B1 /* bound_box_define.py */,
 				8DA91F7E2F79EEF40080D5B1 /* cam_controller.py */,
 				8D1905832F8A8C2E00ED2854 /* config_manager.py */,
-				8DA91F7F2F79EF410080D5B1 /* rois.py */,
 				8DA91F802F79EFCA0080D5B1 /* bound_box_drawer.py */,
-				8DA91F812F79EFEB0080D5B1 /* motion_detector.py */,
-				8D3666C52F7D538E004A585C /* motion_triggered_buffer.py */,
 				8D7EC5452FA0D0D9003FC384 /* motion_object_tracker.py */,
-				8DA91F832F79F0A30080D5B1 /* subject_session.py */,
 				8D7EC5442F9FF317003FC384 /* event_session.py */,
-				8D7EC5492FA2414A003FC384 /* event_session.vintage.py */,
 				8D7EC5462FA0D13C003FC384 /* event_session_manager.py */,
-				8D7EC54A2FA242A7003FC384 /* event_session_manager.vintage.py */,
-				8DA91F842F79F0F40080D5B1 /* centroid_calculation.py */,
-				8DA91F852F79F1DF0080D5B1 /* motion_analysis.py */,
 				8DA91F862F79F2330080D5B1 /* image_subject.py */,
 				8DA91F872F79F3A70080D5B1 /* image_object.py */,
 				8DA91F882F79F3D80080D5B1 /* vision_api.py */,
@@ -65,8 +45,6 @@
 				8D1905822F8A7AC400ED2854 /* overlay_window.py */,
 				8D1905842F8A94FC00ED2854 /* control_panel.py */,
 				8DA91F8A2F79F4C40080D5B1 /* main.py */,
-				8D7EC5482FA23C9F003FC384 /* main.vintage.py */,
-				8D7EC5432F9FEC7C003FC384 /* main.old.py */,
 				8DA91F8B2F79F5210080D5B1 /* logger.py */,
 				8D7EC5422F95A041003FC384 /* session_storyboard.py */,
 			);

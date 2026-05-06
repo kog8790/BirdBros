@@ -1,0 +1,80 @@
+{
+  "session_id": "session_2026-05-01_09-27-23",
+  "started_at": "2026-05-01T09:27:23",
+  "ended_at": "2026-05-01T09:27:26",
+  "task_labels": {
+    "subject_label": "non-human animal",
+    "object_label": "man-made litter or trash",
+    "target_zone_label": "trash receptacle",
+    "action_label": "depositing"
+  },
+  "final_outcome": {
+    "rewarded": false,
+    "label": "stick"
+  },
+  "events": [
+    {
+      "timestamp": "2026-05-01T09:27:23",
+      "type": "session_started",
+      "notes": "Deposit event contact sheet created after object motion cleared.",
+      "image": "01_session_started_frame.jpg",
+      "subject_image": null,
+      "object_image": null,
+      "data": {
+        "task_labels": {
+          "subject_label": "non-human animal",
+          "object_label": "man-made litter or trash",
+          "target_zone_label": "trash receptacle",
+          "action_label": "depositing"
+        }
+      }
+    },
+    {
+      "timestamp": "2026-05-01T09:27:23",
+      "type": "deposit_event_contact_sheet_ready",
+      "notes": "Contact sheet built from selected pre-event and event frames.",
+      "image": "02_deposit_event_contact_sheet_ready_frame.jpg",
+      "subject_image": null,
+      "object_image": "03_deposit_event_contact_sheet_ready_object.jpg",
+      "data": {
+        "task_labels": {
+          "subject_label": "non-human animal",
+          "object_label": "man-made litter or trash",
+          "target_zone_label": "trash receptacle",
+          "action_label": "depositing"
+        }
+      }
+    },
+    {
+      "timestamp": "2026-05-01T09:27:26",
+      "type": "deposit_event_analysis_complete",
+      "notes": "subjectPresent=False, subjectLabel=None, objectPresent=True, objectLabel=stick, actionObserved=False, targetZoneVisible=True, rewardable=False, bestFrameIndex=None, reason=The sequence does not involve a non-human animal. The object seems to be a stick, not man-made litter, and no action of depositing into the trash receptacle is observed.",
+      "image": "04_deposit_event_analysis_complete_frame.jpg",
+      "subject_image": null,
+      "object_image": "05_deposit_event_analysis_complete_object.jpg",
+      "data": {
+        "subjectPresent": false,
+        "subjectLabel": null,
+        "objectPresent": true,
+        "objectLabel": "stick",
+        "actionObserved": false,
+        "targetZoneVisible": true,
+        "rewardable": false,
+        "bestFrameIndex": null,
+        "reason": "The sequence does not involve a non-human animal. The object seems to be a stick, not man-made litter, and no action of depositing into the trash receptacle is observed."
+      }
+    },
+    {
+      "timestamp": "2026-05-01T09:27:26",
+      "type": "final_outcome",
+      "notes": "Reward triggered: False. Reason: The sequence does not involve a non-human animal. The object seems to be a stick, not man-made litter, and no action of depositing into the trash receptacle is observed.. bestFrameIndex=None",
+      "image": "06_final_outcome_frame.jpg",
+      "subject_image": null,
+      "object_image": "07_final_outcome_object.jpg",
+      "data": {
+        "rewarded": false,
+        "label": "stick"
+      }
+    }
+  ]
+}
