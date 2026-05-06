@@ -216,3 +216,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Bird Bros local/dev files
+.DS_Store
+*.swift
+*.xcodeproj
+logs/
+debug_captures/
