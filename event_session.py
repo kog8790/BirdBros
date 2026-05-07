@@ -159,12 +159,14 @@ class event_session:
         copied = []
 
         for record in records[-limit:]:
+            object_frame = record["object_frame"].copy()
+
             copied.append({
                 "timestamp": record.get("timestamp", time.time()),
                 "combined_frame": record["combined_frame"].copy(),
-                "object_frame": record["object_frame"].copy(),
+                "object_frame": object_frame,
                 "subject_frame": record.get("subject_frame").copy() if record.get("subject_frame") is not None else None,
-                "centroid": record.get("centroid"),
+                "centroid": record.get("centroid") or self._estimate_object_centroid(object_frame),
                 "bbox": record.get("bbox"),
                 "area": record.get("area"),
                 "sharpness": record.get("sharpness", self._calculate_sharpness(record["combined_frame"])),
@@ -330,6 +332,46 @@ class event_session:
     # ================================
     # METRICS / HELPERS
     # ================================
+    
+    def _estimate_object_centroid(self, object_frame):
+        if object_frame is None or object_frame.size == 0:
+            return None
+
+        gray = cv2.cvtColor(object_frame, cv2.COLOR_BGR2GRAY)
+        gray = cv2.GaussianBlur(gray, (21, 21), 0)
+
+        _, thresh = cv2.threshold(
+            gray,
+            25,
+            255,
+            cv2.THRESH_BINARY
+        )
+
+        contours, _ = cv2.findContours(
+            thresh,
+            cv2.RETR_EXTERNAL,
+            cv2.CHAIN_APPROX_SIMPLE
+        )
+
+        if not contours:
+            return None
+
+        largest = max(contours, key=cv2.contourArea)
+        area = cv2.contourArea(largest)
+
+        if area <= 0:
+            return None
+
+        moments = cv2.moments(largest)
+
+        if moments["m00"] == 0:
+            x, y, w, h = cv2.boundingRect(largest)
+            return (x + w // 2, y + h // 2)
+
+        cx = int(moments["m10"] / moments["m00"])
+        cy = int(moments["m01"] / moments["m00"])
+
+        return (cx, cy)
 
     def _calculate_sharpness(self, frame):
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -381,7 +423,17 @@ class event_session:
 
     def has_records(self):
         return len(self.records) >= self.min_frames
+        
+    def get_full_centroid_path(self):
+        path = []
 
+        for record in self.pre_event_records + self.records:
+            centroid = record.get("centroid")
+
+            if centroid is not None:
+                path.append(centroid)
+
+        return path
 
     def get_records(self):
         return self.records
