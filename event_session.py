@@ -157,21 +157,34 @@ class event_session:
 
     def _copy_limited_records(self, records, limit):
         copied = []
+        limited_records = records[-limit:]
 
-        for record in records[-limit:]:
+        previous_object_frame = None
+
+        for record in limited_records:
             object_frame = record["object_frame"].copy()
+
+            centroid = record.get("centroid")
+
+            if centroid is None and previous_object_frame is not None:
+                centroid = self._estimate_motion_centroid(
+                    previous_object_frame,
+                    object_frame
+                )
 
             copied.append({
                 "timestamp": record.get("timestamp", time.time()),
                 "combined_frame": record["combined_frame"].copy(),
                 "object_frame": object_frame,
                 "subject_frame": record.get("subject_frame").copy() if record.get("subject_frame") is not None else None,
-                "centroid": record.get("centroid") or self._estimate_object_centroid(object_frame),
+                "centroid": centroid,
                 "bbox": record.get("bbox"),
                 "area": record.get("area"),
                 "sharpness": record.get("sharpness", self._calculate_sharpness(record["combined_frame"])),
                 "source": record.get("source", "pre")
             })
+
+            previous_object_frame = object_frame.copy()
 
         return copied
 
@@ -333,19 +346,29 @@ class event_session:
     # METRICS / HELPERS
     # ================================
     
-    def _estimate_object_centroid(self, object_frame):
-        if object_frame is None or object_frame.size == 0:
+    def _estimate_motion_centroid(self, previous_frame, current_frame):
+        if previous_frame is None or current_frame is None:
             return None
 
-        gray = cv2.cvtColor(object_frame, cv2.COLOR_BGR2GRAY)
-        gray = cv2.GaussianBlur(gray, (21, 21), 0)
+        if previous_frame.size == 0 or current_frame.size == 0:
+            return None
 
-        _, thresh = cv2.threshold(
-            gray,
+        previous_gray = cv2.cvtColor(previous_frame, cv2.COLOR_BGR2GRAY)
+        current_gray = cv2.cvtColor(current_frame, cv2.COLOR_BGR2GRAY)
+
+        previous_gray = cv2.GaussianBlur(previous_gray, (21, 21), 0)
+        current_gray = cv2.GaussianBlur(current_gray, (21, 21), 0)
+
+        frame_delta = cv2.absdiff(previous_gray, current_gray)
+
+        thresh = cv2.threshold(
+            frame_delta,
             25,
             255,
             cv2.THRESH_BINARY
-        )
+        )[1]
+
+        thresh = cv2.dilate(thresh, None, iterations=2)
 
         contours, _ = cv2.findContours(
             thresh,

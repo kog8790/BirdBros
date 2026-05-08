@@ -139,6 +139,7 @@ def main():
     deposit_event_manager = event_session_manager(distance_threshold=125, max_missing_frames=12)
     sheet_builder = contact_sheet_builder(cell_width=220, cell_height=220, padding=6, show_index=True)
     frame_ring_buffer = deque(maxlen=30)
+    recent_event_paths = deque(maxlen=10)
 
     startup_time = time.time()
     warmup_seconds = 3.0
@@ -177,6 +178,7 @@ def main():
         object_tracker.reset()
         deposit_event_manager.reset()
         frame_ring_buffer.clear()
+        recent_event_paths.clear()
 
         prev_object_motion = False
         event_in_progress = False
@@ -198,6 +200,55 @@ def main():
                 object_frame=object_frame,
                 notes=notes
             )
+            
+    # ================================
+    # TRAJECTORY DUPLICATE SUPPRESSION
+    # ================================
+
+    def normalize_centroid_path(path, target_points=6):
+        if not path:
+            return []
+
+        if len(path) <= target_points:
+            return path
+
+        step = (len(path) - 1) / (target_points - 1)
+        indexes = [round(i * step) for i in range(target_points)]
+
+        return [path[index] for index in indexes]
+
+    def calculate_centroid_path_distance(path_a, path_b):
+        normalized_a = normalize_centroid_path(path_a)
+        normalized_b = normalize_centroid_path(path_b)
+
+        if not normalized_a or not normalized_b:
+            return float("inf")
+
+        compare_count = min(len(normalized_a), len(normalized_b))
+
+        if compare_count < 3:
+            return float("inf")
+
+        total_distance = 0.0
+
+        for index in range(compare_count):
+            ax, ay = normalized_a[index]
+            bx, by = normalized_b[index]
+            total_distance += ((ax - bx) ** 2 + (ay - by) ** 2) ** 0.5
+
+        return total_distance / compare_count
+
+    def is_duplicate_centroid_path(path, recent_paths, threshold=35):
+        if len(path) < 3:
+            return False
+
+        for recent_path in recent_paths:
+            distance = calculate_centroid_path_distance(path, recent_path)
+
+            if distance <= threshold:
+                return True
+
+        return False
 
     logger.log_info(
         "Bird Bros overlay loop started",
@@ -451,6 +502,18 @@ def main():
                     if not selected_frames:
                         logger.log_warning("Ready deposit event had no selected frames")
                     else:
+                        centroid_path = ready_event.get_full_centroid_path()
+
+                        if is_duplicate_centroid_path(centroid_path, recent_event_paths):
+                            logger.log_info(
+                                "Duplicate centroid trajectory suppressed before API call",
+                                centroid_path_length=len(centroid_path)
+                            )
+                            event_in_progress = False
+                            continue
+
+                        recent_event_paths.append(centroid_path)
+
                         contact_sheet = sheet_builder.build(selected_frames)
                         best_record = ready_event.get_best_record()
                         best_object_crop = best_record.get("object_frame") if best_record else None
