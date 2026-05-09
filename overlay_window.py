@@ -60,11 +60,13 @@ class overlay_window(QWidget):
         self.setWindowFlags(
             Qt.FramelessWindowHint |
             Qt.WindowStaysOnTopHint |
-            Qt.Tool
+            Qt.Tool |
+            Qt.WindowTransparentForInput
         )
 
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.setAttribute(Qt.WA_NoSystemBackground, True)
+        self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
 
         self.show()
 

@@ -16,6 +16,7 @@ Allow open-source users to tune both system geometry and AI task wording without
 import json
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
+    QApplication,
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
@@ -46,8 +47,8 @@ class control_panel(QWidget):
         self.config = load_config(self.config_path)
 
         self.setWindowTitle("Bird Bros Control Panel")
-        self.setMinimumWidth(460)
-
+        self._apply_responsive_window_size()
+        
         self.setWindowFlags(Qt.Window | Qt.WindowStaysOnTopHint)
 
         self._build_ui()
@@ -222,7 +223,6 @@ class control_panel(QWidget):
         outer_layout.addWidget(scroll)
 
         self.setLayout(outer_layout)
-        self.resize(460, 900)
 
     # ================================
     # SIGNAL WIRING
@@ -279,6 +279,20 @@ class control_panel(QWidget):
     # ================================
     # SMALL HELPERS
     # ================================
+    
+    def _apply_responsive_window_size(self):
+        screen = QApplication.primaryScreen()
+
+        if not screen:
+            return
+
+        geometry = screen.availableGeometry()
+
+        panel_width = int(geometry.width() * 0.32)
+        panel_height = int(geometry.height() * 0.82)
+
+        self.resize(panel_width, panel_height)
+        self.setMinimumWidth(int(geometry.width() * 0.24))
 
     def _make_spinbox(self, min_value, max_value):
         spin = QSpinBox()

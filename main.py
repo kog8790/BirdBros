@@ -154,7 +154,6 @@ def main():
     prev_object_roi = current_config["object_roi"].copy()
     prev_task_labels = current_config.get("task_labels", {}).copy()
 
-    panel.move(region["left"] + region["width"] + 20, region["top"])
     panel.show()
     panel.raise_()
     panel.activateWindow()
@@ -295,10 +294,6 @@ def main():
                     width=region["width"],
                     height=region["height"]
                 )
-
-                panel.move(region["left"] + region["width"] + 20, region["top"])
-                panel.raise_()
-                panel.activateWindow()
 
                 reset_runtime_state(
                     event_text="Warmup",
