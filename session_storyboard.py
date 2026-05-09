@@ -76,8 +76,10 @@ class session_storyboard:
             "label": label
         }
 
+        outcome_event_type = "final_outcome_rewarded" if rewarded else "final_outcome_not_rewarded"
+
         self.add_event(
-            event_type="final_outcome",
+            event_type=outcome_event_type,
             frame=frame,
             subject_frame=subject_frame,
             object_frame=object_frame,

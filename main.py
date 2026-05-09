@@ -154,8 +154,6 @@ def main():
     prev_object_roi = current_config["object_roi"].copy()
     prev_task_labels = current_config.get("task_labels", {}).copy()
 
-    event_in_progress = False
-
     panel.move(region["left"] + region["width"] + 20, region["top"])
     panel.show()
     panel.raise_()
@@ -166,7 +164,6 @@ def main():
         nonlocal warmup_complete_logged
         nonlocal current_event_text
         nonlocal prev_object_motion
-        nonlocal event_in_progress
 
         if storyboard_abort_note and storyboard.active:
             storyboard.abort(notes=storyboard_abort_note)
@@ -181,7 +178,6 @@ def main():
         recent_event_paths.clear()
 
         prev_object_motion = False
-        event_in_progress = False
 
     def finalize_storyboard_if_active(
         rewarded=False,
@@ -484,16 +480,13 @@ def main():
             if active_event_count > 0:
                 current_event_text = f"Object Events Active: {active_event_count}"
 
-            ready_event = None
-            if not event_in_progress:
-                ready_event = deposit_event_manager.get_next_ready_event()
+            ready_event = deposit_event_manager.get_next_ready_event()
 
             """ ### SEGMENT: DEPOSIT EVENT ANALYSIS ###
             Converts one completed event session into a contact sheet, then sends that
             contact sheet to OpenAI using configurable task labels. """
 
-            if ready_event is not None and not event_in_progress:
-                event_in_progress = True
+            if ready_event:
                 current_event_text = "Deposit Event Ready"
 
                 try:
@@ -509,7 +502,6 @@ def main():
                                 "Duplicate centroid trajectory suppressed before API call",
                                 centroid_path_length=len(centroid_path)
                             )
-                            event_in_progress = False
                             continue
 
                         recent_event_paths.append(centroid_path)
@@ -522,17 +514,12 @@ def main():
                         if storyboard.active:
                             storyboard.abort(notes="New deposit event started before previous storyboard finalized.")
 
-                        storyboard.start_session(
-                            opening_frame=contact_sheet.copy(),
-                            notes="Deposit event contact sheet created after object motion cleared.",
+                        storyboard.start_session(                            notes="Deposit event contact sheet created after object motion cleared.",
                             task_labels=task_labels
                         )
 
                         storyboard.add_event(
                             "deposit_event_contact_sheet_ready",
-                            frame=contact_sheet.copy(),
-                            subject_frame=best_subject_crop.copy() if best_subject_crop is not None else None,
-                            object_frame=best_object_crop.copy() if best_object_crop is not None else None,
                             notes="Contact sheet built from selected pre-event and event frames.",
                             data={"task_labels": task_labels}
                         )
@@ -575,9 +562,6 @@ def main():
 
                         storyboard.add_event(
                             "deposit_event_analysis_complete",
-                            frame=contact_sheet.copy(),
-                            subject_frame=best_subject_crop.copy() if best_subject_crop is not None else None,
-                            object_frame=best_object_crop.copy() if best_object_crop is not None else None,
                             notes=(
                                 f"subjectPresent={subject_present}, "
                                 f"subjectLabel={subject_label_result}, "
@@ -603,8 +587,6 @@ def main():
                                 rewarded=True,
                                 label=reward_label,
                                 frame=contact_sheet.copy(),
-                                subject_frame=best_subject_crop.copy() if best_subject_crop is not None else None,
-                                object_frame=best_object_crop.copy() if best_object_crop is not None else None,
                                 notes=f"Reward triggered: True. Reason: {reason}. bestFrameIndex={best_frame_index}"
                             )
 
@@ -619,8 +601,6 @@ def main():
                                 rewarded=False,
                                 label=no_reward_label,
                                 frame=contact_sheet.copy(),
-                                subject_frame=best_subject_crop.copy() if best_subject_crop is not None else None,
-                                object_frame=best_object_crop.copy() if best_object_crop is not None else None,
                                 notes=f"Reward triggered: False. Reason: {reason}. bestFrameIndex={best_frame_index}"
                             )
 
@@ -630,9 +610,6 @@ def main():
 
                     if storyboard.active:
                         storyboard.abort(notes=f"Deposit event analysis failed: {e}")
-
-                finally:
-                    event_in_progress = False
 
             if current_event_text == "Idle" and object_motion:
                 current_event_text = "Motion Detected"
