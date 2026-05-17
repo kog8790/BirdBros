@@ -21,31 +21,22 @@ OUTPUTS:
 - frame (numpy array): shape (H, W, 3), BGR format          """
 
 
+import threading
+import time
 import numpy as np
 import cv2
 import mss
+from pathlib import Path
 
-
-"""     ### SEGMENT: CLASS DEFINITION (cam_controller) ###
-
-ROLE:
-Encapsulates screen capture logic and abstracts away mss usage.
-
-STATE:
-- region: capture area (dict)
-- sct: mss instance
-
-BEHAVIOR:
-- Maintains persistent mss session for performance
-- Captures raw screen pixels from specified region
-- Converts to numpy array usable by OpenCV pipeline
-
-IMPORTANT:
-- Coordinates must match the same space used by ROI logic in main.py
-- No scaling or transformation should occur here
-- Returns raw, unmodified pixel data            """
 class cam_controller:
-    def __init__(self, region, fps=30):
+    def __init__(
+        self,
+        capture_region,
+        fps=30,
+        input_mode="screen_capture",
+        video_path="",
+        loop_video=True
+    ):
         """
         region example:
         {
@@ -55,17 +46,46 @@ class cam_controller:
             "height": 600
         }
         """
-        self.region = region
+        self.capture_region = capture_region
         self.fps = fps
+
+        self.input_mode = input_mode
+        self.video_path = video_path
+        self.loop_video = loop_video
+
+        self.video_capture = None
+
         self.sct = mss.mss()
+
+        if self.input_mode == "video_file":
+
+            if not Path(self.video_path).exists():
+                raise FileNotFoundError(f"Video file not found: {self.video_path}")
+
+            self.video_capture = cv2.VideoCapture(self.video_path)
 
     """ ### SEGMENT: FRAME CAPTURE ###
     get_frame():
     Captures screen region via mss and returns BGR numpy frame (H, W, 3)."""
     def get_frame(self):
-        screenshot = self.sct.grab(self.region)
-        frame = np.array(screenshot)
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
+        if self.input_mode == "screen_capture":
+
+            screenshot = self.sct.grab(self.capture_region)
+
+            frame = np.array(screenshot)
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
+
+        elif self.input_mode == "video_file":
+
+            success, frame = self.video_capture.read()
+
+            if not success:
+
+                if self.loop_video:
+                    self.video_capture.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                    return self.get_frame()
+
+                return None
         return frame
 
     def capture_frame(self):
@@ -73,6 +93,12 @@ class cam_controller:
 
     def go_dormant(self):
         pass
+        
+    def stop(self):
+        self.running = False
+
+        if self.video_capture is not None:
+            self.video_capture.release()
 
 
 

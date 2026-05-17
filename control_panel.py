@@ -11,7 +11,8 @@ RESPONSIBILITIES:
 - Emit live config updates to main.py
 
 DESIGN INTENT:
-Allow open-source users to tune both system geometry and AI task wording without code edits. """
+Allow open-source users to tune both system geometry and AI task wording without code edits.
+"""
 
 import json
 from PySide6.QtCore import Qt, Signal
@@ -48,7 +49,6 @@ class control_panel(QWidget):
 
         self.setWindowTitle("Bird Bros Control Panel")
         self._apply_responsive_window_size()
-        
         self.setWindowFlags(Qt.Window | Qt.WindowStaysOnTopHint)
 
         self._build_ui()
@@ -62,6 +62,8 @@ class control_panel(QWidget):
 
     def _build_ui(self):
         main_layout = QVBoxLayout()
+        main_layout.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
+        main_layout.setSpacing(14)
 
         capture_group = QGroupBox("Capture Region")
         capture_form = QFormLayout()
@@ -76,6 +78,32 @@ class control_panel(QWidget):
         capture_form.addRow("Width", self.capture_width)
         capture_form.addRow("Height", self.capture_height)
         capture_group.setLayout(capture_form)
+        
+        video_group = QGroupBox("Video Input")
+        video_layout = QVBoxLayout()
+        video_layout.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
+        video_layout.setSpacing(10)
+
+        self.video_mode = QComboBox()
+        self.video_mode.addItems(["screen_capture", "video_file"])
+
+        self.video_path = QLineEdit()
+        self.video_path.setPlaceholderText("/path/to/video.mp4")
+
+        self.video_loop = QCheckBox("Loop Video")
+        self.video_fps = self._make_spinbox(1, 120)
+
+        self.video_mode_row = self._make_reward_row("Mode", self.video_mode)
+        self.video_path_row = self._make_reward_row("Video Path", self.video_path)
+        self.video_loop_row = self._make_reward_row("Loop", self.video_loop)
+        self.video_fps_row = self._make_reward_row("FPS", self.video_fps)
+
+        video_layout.addWidget(self.video_mode_row)
+        video_layout.addWidget(self.video_path_row)
+        video_layout.addWidget(self.video_loop_row)
+        video_layout.addWidget(self.video_fps_row)
+
+        video_group.setLayout(video_layout)
 
         subject_group = QGroupBox("Subject ROI")
         subject_form = QFormLayout()
@@ -148,7 +176,9 @@ class control_panel(QWidget):
         task_group.setLayout(task_form)
 
         reward_group = QGroupBox("Reward Action")
-        reward_form = QFormLayout()
+        reward_layout = QVBoxLayout()
+        reward_layout.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
+        reward_layout.setSpacing(10)
 
         self.reward_mode = QComboBox()
         self.reward_mode.addItems(["debug_popup", "mouse_click", "keyboard_shortcut", "webhook", "shell_command"])
@@ -163,7 +193,7 @@ class control_panel(QWidget):
         self.reward_keys.setPlaceholderText("command,space")
 
         self.reward_command = QLineEdit()
-        self.reward_command.setPlaceholderText("python3 my_script.py")
+        self.reward_command.setPlaceholderText("open /System/Applications/Calculator.app")
 
         self.reward_url = QLineEdit()
         self.reward_url.setPlaceholderText("https://example.com/webhook")
@@ -173,20 +203,48 @@ class control_panel(QWidget):
 
         self.reward_timeout = self._make_spinbox(1, 300)
 
-        reward_form.addRow("Mode", self.reward_mode)
-        reward_form.addRow("Mouse X", self.reward_x)
-        reward_form.addRow("Mouse Y", self.reward_y)
-        reward_form.addRow("Mouse Clicks", self.reward_clicks)
-        reward_form.addRow("Click Interval (ms)", self.reward_interval_ms)
-        reward_form.addRow("Move Duration (ms)", self.reward_move_duration_ms)
-        reward_form.addRow("Shortcut Keys", self.reward_keys)
-        reward_form.addRow("Shell Command", self.reward_command)
-        reward_form.addRow("Webhook URL", self.reward_url)
-        reward_form.addRow("Webhook Method", self.reward_method)
-        reward_form.addRow("Webhook Timeout (s)", self.reward_timeout)
-        reward_group.setLayout(reward_form)
+        self.reward_bearer_token = QLineEdit()
+        self.reward_bearer_token.setPlaceholderText("optional bearer token")
 
-        button_row = QHBoxLayout()
+        self.reward_headers = QLineEdit()
+        self.reward_headers.setPlaceholderText('optional JSON: {"X-Source":"BirdBros"}')
+
+        self.reward_payload = QLineEdit()
+        self.reward_payload.setPlaceholderText('optional JSON: {"event":"reward"}')
+
+        self.reward_mode_row = self._make_reward_row("Mode", self.reward_mode)
+        self.reward_x_row = self._make_reward_row("Mouse X", self.reward_x)
+        self.reward_y_row = self._make_reward_row("Mouse Y", self.reward_y)
+        self.reward_clicks_row = self._make_reward_row("Mouse Clicks", self.reward_clicks)
+        self.reward_interval_row = self._make_reward_row("Click Interval (ms)", self.reward_interval_ms)
+        self.reward_move_duration_row = self._make_reward_row("Move Duration (ms)", self.reward_move_duration_ms)
+        self.reward_keys_row = self._make_reward_row("Shortcut Keys", self.reward_keys)
+        self.reward_command_row = self._make_reward_row("Shell Command", self.reward_command)
+        self.reward_url_row = self._make_reward_row("Webhook URL", self.reward_url)
+        self.reward_method_row = self._make_reward_row("Webhook Method", self.reward_method)
+        self.reward_timeout_row = self._make_reward_row("Webhook Timeout (s)", self.reward_timeout)
+        self.reward_bearer_row = self._make_reward_row("Bearer Token", self.reward_bearer_token)
+        self.reward_headers_row = self._make_reward_row("Headers JSON", self.reward_headers)
+        self.reward_payload_row = self._make_reward_row("Payload JSON", self.reward_payload)
+
+        reward_layout.addWidget(self.reward_mode_row)
+        reward_layout.addWidget(self.reward_x_row)
+        reward_layout.addWidget(self.reward_y_row)
+        reward_layout.addWidget(self.reward_clicks_row)
+        reward_layout.addWidget(self.reward_interval_row)
+        reward_layout.addWidget(self.reward_move_duration_row)
+        reward_layout.addWidget(self.reward_keys_row)
+        reward_layout.addWidget(self.reward_command_row)
+        reward_layout.addWidget(self.reward_url_row)
+        reward_layout.addWidget(self.reward_method_row)
+        reward_layout.addWidget(self.reward_timeout_row)
+        reward_layout.addWidget(self.reward_bearer_row)
+        reward_layout.addWidget(self.reward_headers_row)
+        reward_layout.addWidget(self.reward_payload_row)
+
+        reward_group.setLayout(reward_layout)
+
+        button_row = QVBoxLayout()
 
         self.save_button = QPushButton("Save Config")
         self.reload_button = QPushButton("Reload Config")
@@ -203,6 +261,7 @@ class control_panel(QWidget):
         self.status_label = QLabel("Ready")
 
         main_layout.addWidget(capture_group)
+        main_layout.addWidget(video_group)
         main_layout.addWidget(subject_group)
         main_layout.addWidget(object_group)
         main_layout.addWidget(motion_group)
@@ -217,9 +276,14 @@ class control_panel(QWidget):
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         scroll.setWidget(content_widget)
 
         outer_layout = QVBoxLayout()
+        outer_layout.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
+        outer_layout.setContentsMargins(18, 18, 18, 18)
+        outer_layout.setSpacing(14)
         outer_layout.addWidget(scroll)
 
         self.setLayout(outer_layout)
@@ -253,14 +317,21 @@ class control_panel(QWidget):
         for widget in checkboxes:
             widget.stateChanged.connect(self._on_widget_changed)
 
-        combos = [self.reward_mode, self.reward_method]
-        for widget in combos:
-            widget.currentIndexChanged.connect(self._on_widget_changed)
+        self.reward_mode.currentTextChanged.connect(self._on_reward_action_changed)
+        self.reward_method.currentIndexChanged.connect(self._on_widget_changed)
+        
+        self.video_mode.currentTextChanged.connect(self._on_video_input_changed)
+        self.video_loop.stateChanged.connect(self._on_widget_changed)
+        self.video_fps.valueChanged.connect(self._on_widget_changed)
+        self.video_path.textChanged.connect(self._on_widget_changed)
 
         lineedits = [
             self.reward_keys,
             self.reward_command,
             self.reward_url,
+            self.reward_bearer_token,
+            self.reward_headers,
+            self.reward_payload,
             self.subject_label,
             self.object_label,
             self.target_zone_label,
@@ -279,7 +350,7 @@ class control_panel(QWidget):
     # ================================
     # SMALL HELPERS
     # ================================
-    
+
     def _apply_responsive_window_size(self):
         screen = QApplication.primaryScreen()
 
@@ -288,11 +359,11 @@ class control_panel(QWidget):
 
         geometry = screen.availableGeometry()
 
-        panel_width = int(geometry.width() * 0.32)
-        panel_height = int(geometry.height() * 0.82)
+        panel_width = int(geometry.width() * 0.20)
+        panel_height = geometry.height()
 
         self.resize(panel_width, panel_height)
-        self.setMinimumWidth(int(geometry.width() * 0.24))
+        self.setMinimumWidth(int(geometry.width() * 0.14))
 
     def _make_spinbox(self, min_value, max_value):
         spin = QSpinBox()
@@ -300,8 +371,34 @@ class control_panel(QWidget):
         spin.setSingleStep(1)
         return spin
 
+    def _make_reward_row(self, label_text, widget):
+        row = QWidget()
+        row_layout = QHBoxLayout(row)
+        row_layout.setContentsMargins(0, 0, 0, 0)
+        row_layout.setSpacing(10)
+
+        label = QLabel(label_text)
+        label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+
+        row_layout.addWidget(label, 1)
+        row_layout.addWidget(widget, 1)
+
+        return row
+
     def _parse_keys(self, text):
         return [part.strip() for part in text.split(",") if part.strip()]
+
+    def _parse_json_text(self, text, fallback):
+        value = text.strip()
+
+        if not value:
+            return fallback
+
+        try:
+            parsed = json.loads(value)
+            return parsed
+        except Exception:
+            return fallback
 
     def _line_value(self, widget, fallback):
         value = widget.text().strip()
@@ -317,6 +414,51 @@ class control_panel(QWidget):
 
     def emit_config(self):
         self.config_changed.emit(self.get_current_config())
+
+    # ================================
+    # DYNAMIC REWARD ACTION UI
+    # ================================
+
+    def _on_reward_action_changed(self):
+        action_type = self.reward_mode.currentText()
+
+        mouse_visible = action_type == "mouse_click"
+        keyboard_visible = action_type == "keyboard_shortcut"
+        command_visible = action_type == "shell_command"
+        webhook_visible = action_type == "webhook"
+
+        self.reward_x_row.setVisible(mouse_visible)
+        self.reward_y_row.setVisible(mouse_visible)
+        self.reward_clicks_row.setVisible(mouse_visible)
+        self.reward_interval_row.setVisible(mouse_visible)
+        self.reward_move_duration_row.setVisible(mouse_visible)
+
+        self.reward_keys_row.setVisible(keyboard_visible)
+
+        self.reward_command_row.setVisible(command_visible)
+
+        self.reward_url_row.setVisible(webhook_visible)
+        self.reward_method_row.setVisible(webhook_visible)
+        self.reward_timeout_row.setVisible(webhook_visible)
+        self.reward_bearer_row.setVisible(webhook_visible)
+        self.reward_headers_row.setVisible(webhook_visible)
+        self.reward_payload_row.setVisible(webhook_visible)
+
+        self._on_widget_changed()
+        
+    # ================================
+    # DYNAMIC VIDEO INPUT UI
+    # ================================
+
+    def _on_video_input_changed(self):
+        input_mode = self.video_mode.currentText()
+
+        video_file_visible = input_mode == "video_file"
+
+        self.video_path_row.setVisible(video_file_visible)
+        self.video_loop_row.setVisible(video_file_visible)
+
+        self._on_widget_changed()
 
     # ================================
     # UI → CONFIG SYNC
@@ -337,6 +479,12 @@ class control_panel(QWidget):
                 "top": self.capture_top.value(),
                 "width": capture_width,
                 "height": capture_height
+            },
+            "video_input": {
+                "mode": self.video_mode.currentText(),
+                "video_path": self.video_path.text().strip(),
+                "loop_video": self.video_loop.isChecked(),
+                "fps": self.video_fps.value()
             },
             "subject_roi": {
                 "x_pct": px_to_pct(self.subject_x.value(), capture_width),
@@ -377,7 +525,10 @@ class control_panel(QWidget):
                 "command": self.reward_command.text().strip(),
                 "url": self.reward_url.text().strip(),
                 "method": self.reward_method.currentText(),
-                "timeout": self.reward_timeout.value()
+                "timeout": self.reward_timeout.value(),
+                "bearer_token": self.reward_bearer_token.text().strip(),
+                "headers": self._parse_json_text(self.reward_headers.text(), {}),
+                "payload": self._parse_json_text(self.reward_payload.text(), {})
             },
             "no_reward_action": self.config.get("no_reward_action", {"mode": "debug_popup"})
         }
@@ -393,6 +544,13 @@ class control_panel(QWidget):
         self.capture_top.setValue(cfg["capture_region"]["top"])
         self.capture_width.setValue(cfg["capture_region"]["width"])
         self.capture_height.setValue(cfg["capture_region"]["height"])
+        
+        video_cfg = cfg.get("video_input", DEFAULT_CONFIG["video_input"])
+
+        self.video_mode.setCurrentText(video_cfg.get("mode", "screen_capture"))
+        self.video_path.setText(video_cfg.get("video_path", ""))
+        self.video_loop.setChecked(video_cfg.get("loop_video", True))
+        self.video_fps.setValue(video_cfg.get("fps", 6))
 
         def pct_to_px(value_pct, total):
             return int(value_pct * total)
@@ -436,8 +594,13 @@ class control_panel(QWidget):
         self.reward_url.setText(reward_cfg.get("url", ""))
         self.reward_method.setCurrentText(reward_cfg.get("method", "POST"))
         self.reward_timeout.setValue(int(reward_cfg.get("timeout", 5)))
+        self.reward_bearer_token.setText(reward_cfg.get("bearer_token", ""))
+        self.reward_headers.setText(json.dumps(reward_cfg.get("headers", {})))
+        self.reward_payload.setText(json.dumps(reward_cfg.get("payload", {})))
 
         self.status_label.setText("Config loaded")
+        self._on_reward_action_changed()
+        self._on_video_input_changed()
 
     # ================================
     # CONFIG FILE ACTIONS
@@ -472,4 +635,6 @@ config_manager → control_panel → main.py
 KEY BEHAVIOR:
 - ROI controls display pixels but store percentages
 - Task-label controls feed configurable OpenAI prompt variables
-- Reward controls remain runtime editable """
+- Reward controls remain runtime editable
+- Reward action fields appear only when relevant to the selected reward mode
+"""

@@ -30,6 +30,12 @@ INCLUDES:
 - prompt/task labels
 - reward/no-reward action settings """
 DEFAULT_CONFIG = {
+    "video_input": {
+        "mode": "screen_capture",
+        "video_path": "",
+        "loop_video": True,
+        "fps": 30
+    },
     "capture_region": {
         "left": 100,
         "top": 100,
@@ -75,7 +81,10 @@ DEFAULT_CONFIG = {
         "command": "",
         "url": "",
         "method": "POST",
-        "timeout": 5
+        "timeout": 5,
+        "headers": {},
+        "payload": {},
+        "bearer_token": ""
     },
     "no_reward_action": {
         "mode": "debug_popup"

@@ -131,7 +131,16 @@ def main():
         height=region["height"]
     )
 
-    cam = cam_controller(region=region, fps=30)
+    video_config = current_config.get("video_input", {})
+
+    cam = cam_controller(
+        capture_region=region,
+        fps=video_config.get("fps", 30),
+        input_mode=video_config.get("mode", "screen_capture"),
+        video_path=video_config.get("video_path", ""),
+        loop_video=video_config.get("loop_video", True)
+    )
+
     drawer = bound_box_drawer()
 
     motion_min_area = current_config["motion"]["min_area"]
@@ -154,10 +163,23 @@ def main():
     prev_object_roi = current_config["object_roi"].copy()
     prev_task_labels = current_config.get("task_labels", {}).copy()
 
+    screen = app.primaryScreen().availableGeometry()
+
+    panel_width = int(screen.width() * 0.30)
+    panel_height = screen.height()
+
+    panel.resize(panel_width, panel_height)
+
+    desired_x = region["left"] + region["width"] + 20
+    max_x = screen.width() - panel_width
+    panel_x = screen.x() + screen.width() - panel_width
+
+    panel.move(panel_x, screen.top())
+
     panel.show()
     panel.raise_()
     panel.activateWindow()
-
+    
     def reset_runtime_state(event_text="Warmup", storyboard_abort_note=None):
         nonlocal startup_time
         nonlocal warmup_complete_logged

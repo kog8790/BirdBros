@@ -133,6 +133,10 @@ class resulting_action:
         timeout = float(action_config.get("timeout", 5))
         headers = action_config.get("headers", {})
         payload = action_config.get("payload", {})
+        bearer_token = action_config.get("bearer_token", "").strip()
+        
+        if bearer_token:
+            headers["Authorization"] = f"Bearer {bearer_token}"
 
         if not url:
             print("[ACTION] webhook mode requires 'url'.")

@@ -6,27 +6,35 @@
     "height": 700
   },
   "subject_roi": {
-    "x_pct": 0.5,
+    "x_pct": 0.5722222222222222,
     "y_pct": 0.14285714285714285,
-    "w_pct": 0.5555555555555556,
-    "h_pct": 0.42857142857142855
+    "w_pct": 0.3888888888888889,
+    "h_pct": 0.35714285714285715
   },
   "object_roi": {
-    "x_pct": 0.6166666666666667,
-    "y_pct": 0.3171428571428571,
-    "w_pct": 0.37,
-    "h_pct": 0.15857142857142856
+    "x_pct": 0.6666666666666666,
+    "y_pct": 0.3157142857142857,
+    "w_pct": 0.25,
+    "h_pct": 0.15714285714285714
   },
   "motion": {
     "min_area": 1500
   },
   "display": {
+    "show_overlay": true,
     "show_grid": false,
     "show_coords": false,
-    "show_capture_border": true
+    "show_capture_border": true,
+    "show_labels": true
+  },
+  "task_labels": {
+    "subject_label": "non-human animal",
+    "object_label": "man-made litter or trash",
+    "target_zone_label": "trash receptacle",
+    "action_label": "depositing"
   },
   "reward_action": {
-    "mode": "mouse_click",
+    "mode": "webhook",
     "x": 735,
     "y": 586,
     "clicks": 3,
@@ -36,10 +44,20 @@
       "command",
       "space"
     ],
-    "command": "",
-    "url": "",
+    "command": "open /System/Applications/Calculator.app",
+    "url": "https://webhook.site/9901e446-d44d-4b3e-827c-65e6d6fba956",
     "method": "POST",
-    "timeout": 5
+    "timeout": 5,
+    "bearer_token": "test-token-123",
+    "headers": {
+      "X-Source": "BirdBros",
+      "X-Test": "reward-action"
+    },
+    "payload": {
+      "event": "reward_triggered",
+      "label": "test_litter",
+      "source": "BirdBros"
+    }
   },
   "no_reward_action": {
     "mode": "debug_popup"
