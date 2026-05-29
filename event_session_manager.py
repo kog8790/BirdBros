@@ -4,11 +4,12 @@ Manages multiple concurrent event_session objects.
 
 CORE FLOW:
 - Receives object motion detections from motion_object_tracker
-- Matches detections to active sessions using centroid distance
-- Creates new sessions for unmatched detections
+- Spawns a new session on every stable-to-motion transition in object ROI
+- Updates existing sessions while motion continues
 - Injects pre-event ring buffer frames into new sessions
-- Completes sessions after detections disappear
-- Queues completed sessions for contact sheet analysis
+- Completes sessions after detections disappear long enough
+- Rejects weak/noisy sessions before they reach OpenAI
+- Queues viable completed sessions for contact sheet analysis
 """
 
 import math
@@ -24,14 +25,24 @@ class event_session_manager:
         self,
         distance_threshold=75,
         max_missing_frames=3,
-        max_active_sessions=5
+        max_active_sessions=8,
+        min_event_frames=3,
+        min_event_duration_seconds=0.10,
+        min_event_path_distance=8.0
     ):
         self.distance_threshold = distance_threshold
         self.max_missing_frames = max_missing_frames
         self.max_active_sessions = max_active_sessions
 
+        self.min_event_frames = min_event_frames
+        self.min_event_duration_seconds = min_event_duration_seconds
+        self.min_event_path_distance = min_event_path_distance
+
         self.active_sessions = []
         self.completed_sessions = []
+        self.rejected_sessions = []
+
+        self.previous_motion_detected = False
 
 
     # ================================
@@ -39,8 +50,80 @@ class event_session_manager:
     # ================================
 
     def update(self, detections, combined_frame, object_frame, pre_buffer=None):
+        motion_detected = len(detections) > 0
+        motion_started = motion_detected and not self.previous_motion_detected
+
         matched_sessions = set()
 
+        if motion_started:
+            self._spawn_session_from_motion_start(
+                detections=detections,
+                combined_frame=combined_frame,
+                object_frame=object_frame,
+                pre_buffer=pre_buffer or [],
+                matched_sessions=matched_sessions
+            )
+
+        if motion_detected:
+            self._update_sessions_from_detections(
+                detections=detections,
+                combined_frame=combined_frame,
+                object_frame=object_frame,
+                matched_sessions=matched_sessions
+            )
+
+        self._age_unmatched_sessions(
+            matched_sessions=matched_sessions,
+            combined_frame=combined_frame,
+            object_frame=object_frame
+        )
+
+        self.previous_motion_detected = motion_detected
+
+
+    # ================================
+    # SESSION CREATION / UPDATES
+    # ================================
+
+    def _spawn_session_from_motion_start(
+        self,
+        detections,
+        combined_frame,
+        object_frame,
+        pre_buffer,
+        matched_sessions
+    ):
+        if len(self.active_sessions) >= self.max_active_sessions:
+            return
+
+        primary_detection = self._select_primary_detection(detections)
+
+        if primary_detection is None:
+            return
+
+        new_session = self._create_session()
+        new_session.missing_frames = 0
+
+        new_session.update(
+            combined_frame=combined_frame,
+            object_frame=object_frame,
+            motion_detected=True,
+            centroid=primary_detection.get("centroid"),
+            bbox=primary_detection.get("bbox"),
+            area=primary_detection.get("area"),
+            pre_event_records=pre_buffer
+        )
+
+        self.active_sessions.append(new_session)
+        matched_sessions.add(new_session)
+
+    def _update_sessions_from_detections(
+        self,
+        detections,
+        combined_frame,
+        object_frame,
+        matched_sessions
+    ):
         for detection in detections:
             centroid = detection.get("centroid")
             bbox = detection.get("bbox")
@@ -51,41 +134,40 @@ class event_session_manager:
 
             matched_session = self._find_closest_session(centroid, matched_sessions)
 
-            if matched_session:
-                matched_session.missing_frames = 0
-                matched_session.update(
-                    combined_frame=combined_frame,
-                    object_frame=object_frame,
-                    motion_detected=True,
-                    centroid=centroid,
-                    bbox=bbox,
-                    area=area
-                )
-                matched_sessions.add(matched_session)
+            if not matched_session:
+                continue
 
-            else:
-                if len(self.active_sessions) >= self.max_active_sessions:
-                    continue
+            matched_session.missing_frames = 0
+            matched_session.update(
+                combined_frame=combined_frame,
+                object_frame=object_frame,
+                motion_detected=True,
+                centroid=centroid,
+                bbox=bbox,
+                area=area
+            )
 
-                new_session = event_session()
-                new_session.missing_frames = 0
-                new_session.update(
-                    combined_frame=combined_frame,
-                    object_frame=object_frame,
-                    motion_detected=True,
-                    centroid=centroid,
-                    bbox=bbox,
-                    area=area,
-                    pre_event_records=pre_buffer or []
-                )
+            matched_sessions.add(matched_session)
 
-                self.active_sessions.append(new_session)
-                matched_sessions.add(new_session)
+    def _create_session(self):
+        return event_session(
+            min_frames=self.min_event_frames,
+            min_duration_seconds=self.min_event_duration_seconds,
+            min_path_distance=self.min_event_path_distance
+        )
 
-        self._age_unmatched_sessions(
-            matched_sessions=matched_sessions,
-            combined_frame=combined_frame,
-            object_frame=object_frame
+    def _select_primary_detection(self, detections):
+        valid_detections = [
+            detection for detection in detections
+            if detection.get("centroid") is not None
+        ]
+
+        if not valid_detections:
+            return None
+
+        return max(
+            valid_detections,
+            key=lambda detection: detection.get("area", 0)
         )
 
 
@@ -116,7 +198,6 @@ class event_session_manager:
                 closest_session = session
 
         return closest_session
-
 
     def _get_last_centroid(self, session):
         records = session.get_records()
@@ -152,14 +233,22 @@ class event_session_manager:
 
                 self._complete_session(session)
 
-
     def _complete_session(self, session):
         if session in self.active_sessions:
             self.active_sessions.remove(session)
 
-        if session.has_records():
+        if session.is_viable():
             self.completed_sessions.append(session)
+        else:
+            self.rejected_sessions.append(session)
 
+            print(
+                "[SESSION_REJECTED]",
+                f"reason={session.get_rejection_reason()}",
+                f"frames={len(session.get_records())}",
+                f"duration={session.get_duration_seconds():.3f}",
+                f"path_length={session.get_event_path_length():.1f}"
+            )
 
     # ================================
     # READY EVENT QUEUE
@@ -170,7 +259,12 @@ class event_session_manager:
             return None
 
         return self.completed_sessions.pop(0)
+        
+    def get_next_rejected_event(self):
+        if not self.rejected_sessions:
+            return None
 
+        return self.rejected_sessions.pop(0)
 
     # ================================
     # RESET / HELPERS
@@ -179,18 +273,20 @@ class event_session_manager:
     def reset(self):
         self.active_sessions = []
         self.completed_sessions = []
-
+        self.rejected_sessions = []
+        self.previous_motion_detected = False
 
     def _distance(self, a, b):
         return math.hypot(a[0] - b[0], a[1] - b[1])
 
-
     def get_active_count(self):
         return len(self.active_sessions)
 
-
     def get_completed_count(self):
         return len(self.completed_sessions)
+
+    def get_rejected_count(self):
+        return len(self.rejected_sessions)
 
 
 """ ### SEGMENT: SYSTEM CONTEXT ###
@@ -199,17 +295,21 @@ motion_object_tracker.detect(object_crop)
     ↓
 event_session_manager.update(...)
     ↓
-match detection to active session OR start new session
+stable-to-motion edge creates a new session
+    ↓
+active sessions update from matching detections
     ↓
 unmatched sessions age out and complete
     ↓
-main.py pulls completed session
+weak sessions are rejected before API
+    ↓
+main.py pulls viable completed session
     ↓
 contact_sheet_builder builds grid
     ↓
 OpenAI analyzes event sequence
 
 DESIGN INTENT:
-This class manages event lifecycle only. It does not analyze images,
-call OpenAI, trigger rewards, or write storyboards.
+This class decides whether object ROI motion forms a distinct viable event.
+It does not call OpenAI, trigger rewards, or write storyboards.
 """

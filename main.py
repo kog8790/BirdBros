@@ -85,10 +85,37 @@ def main():
     api_key = os.getenv("OPENAI_API_KEY")
 
     if not api_key:
-        raise ValueError("OPENAI_API_KEY not found in .env")
+
+        from PyQt6.QtWidgets import (
+            QInputDialog,
+            QMessageBox
+        )
+
+        api_key, ok = QInputDialog.getText(
+            None,
+            "Bird Bros Setup",
+            "Enter your OpenAI API Key:"
+        )
+
+        if not ok or not api_key.strip():
+            QMessageBox.critical(
+                None,
+                "Bird Bros",
+                "An OpenAI API Key is required."
+            )
+            return
+
+        with open(".env", "w") as env_file:
+            env_file.write(
+                f"OPENAI_API_KEY={api_key.strip()}\n"
+            )
+
+        api_key = api_key.strip()
 
     vision = vision_api(api_key=api_key)
     logger = Logger()
+    
+    logger.purge_old_files(log_retention_days=90, storyboard_retention_days=14)
 
     app = get_or_create_qt_app()
     running = True
@@ -496,6 +523,59 @@ def main():
 
             if active_event_count > 0:
                 current_event_text = f"Object Events Active: {active_event_count}"
+                
+            rejected_event = deposit_event_manager.get_next_rejected_event()
+
+            if rejected_event:
+
+                first_stable_record = rejected_event.get_first_stable_record()
+                best_record = rejected_event.get_best_record()
+
+                first_stable_frame = (
+                    first_stable_record.get("combined_frame")
+                    if first_stable_record
+                    else None
+                )
+
+                best_event_frame = (
+                    best_record.get("combined_frame")
+                    if best_record
+                    else None
+                )
+
+                rejected_frames = rejected_event.get_contact_sheet_frames()
+                rejected_contact_sheet = sheet_builder.build(rejected_frames)
+
+                storyboard.start_session(
+                    rejected=True,
+                    opening_frame=first_stable_frame,
+                    notes=(
+                        f"Rejected event. "
+                        f"Reason: {rejected_event.get_rejection_reason()}."
+                    ),
+                    task_labels=current_config.get("task_labels", {})
+                )
+
+                storyboard.add_event(
+                    "rejected_event_best_frame",
+                    frame=best_event_frame,
+                    notes=(
+                        "Best available frame selected from rejected event."
+                    )
+                )
+
+                storyboard.finalize(
+                    rewarded=False,
+                    label="Rejected Event",
+                    frame=rejected_contact_sheet,
+                    notes=(
+                        f"This event was rejected before API analysis. "
+                        f"Reason={rejected_event.get_rejection_reason()}. "
+                        f"Frames={len(rejected_event.get_records())}. "
+                        f"Duration={rejected_event.get_duration_seconds():.3f}s. "
+                        f"PathLength={rejected_event.get_event_path_length():.1f}."
+                    )
+                )
 
             ready_event = deposit_event_manager.get_next_ready_event()
 
@@ -525,19 +605,24 @@ def main():
 
                         contact_sheet = sheet_builder.build(selected_frames)
                         best_record = ready_event.get_best_record()
-                        best_object_crop = best_record.get("object_frame") if best_record else None
-                        best_subject_crop = best_record.get("subject_frame") if best_record else None
+                        first_stable_record = ready_event.get_first_stable_record()
+
+                        best_event_frame = best_record.get("combined_frame") if best_record else None
+                        first_stable_frame = first_stable_record.get("combined_frame") if first_stable_record else None
 
                         if storyboard.active:
                             storyboard.abort(notes="New deposit event started before previous storyboard finalized.")
 
-                        storyboard.start_session(                            notes="Deposit event contact sheet created after object motion cleared.",
+                        storyboard.start_session(
+                            opening_frame=first_stable_frame.copy() if first_stable_frame is not None else None,
+                            notes="Deposit event session started; first stable post-motion frame captured.",
                             task_labels=task_labels
                         )
 
                         storyboard.add_event(
                             "deposit_event_contact_sheet_ready",
-                            notes="Contact sheet built from selected pre-event and event frames.",
+                            frame=best_event_frame.copy() if best_event_frame is not None else None,
+                            notes="Best mid-trajectory event frame selected; contact sheet built from selected pre-event and event frames.",
                             data={"task_labels": task_labels}
                         )
 
@@ -562,6 +647,7 @@ def main():
                         rewardable = deposit_result["rewardable"]
                         best_frame_index = deposit_result["bestFrameIndex"]
                         reason = deposit_result["reason"]
+                        justification = deposit_result.get("justification", "")
 
                         logger.log_api_result(
                             "deposit_event_contact_sheet_analysis",
@@ -574,6 +660,7 @@ def main():
                             rewardable=rewardable,
                             bestFrameIndex=best_frame_index,
                             reason=reason,
+                            justification=justification,
                             task_labels=task_labels
                         )
 
@@ -588,7 +675,8 @@ def main():
                                 f"targetZoneVisible={target_zone_visible}, "
                                 f"rewardable={rewardable}, "
                                 f"bestFrameIndex={best_frame_index}, "
-                                f"reason={reason}"
+                                f"reason={reason}, "
+                                f"justification={justification}"
                             ),
                             data=deposit_result
                         )
@@ -604,7 +692,7 @@ def main():
                                 rewarded=True,
                                 label=reward_label,
                                 frame=contact_sheet.copy(),
-                                notes=f"Reward triggered: True. Reason: {reason}. bestFrameIndex={best_frame_index}"
+                                notes=f"Reward triggered: True. Reason: {reason}. Justification: {justification}. bestFrameIndex={best_frame_index}"
                             )
 
                         else:
@@ -618,7 +706,7 @@ def main():
                                 rewarded=False,
                                 label=no_reward_label,
                                 frame=contact_sheet.copy(),
-                                notes=f"Reward triggered: False. Reason: {reason}. bestFrameIndex={best_frame_index}"
+                                notes=f"Reward triggered: False. Reason: {reason}. Justification: {justification}. bestFrameIndex={best_frame_index}"
                             )
 
                 except Exception as e:

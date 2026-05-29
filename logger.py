@@ -14,6 +14,7 @@ Provide a lightweight memory layer without coupling logging to runtime logic. ""
 
 import os
 import json
+import shutil
 from datetime import datetime
 
 
@@ -35,6 +36,51 @@ class Logger:
 
     def _timestamp(self):
         return datetime.now().isoformat(timespec="seconds")
+        
+    def purge_old_files(self, log_retention_days=90, storyboard_retention_days=14):
+        now = datetime.now()
+
+        # ----------------------------
+        # Purge old log files
+        # ----------------------------
+
+        for filename in os.listdir(self.log_dir):
+
+            path = os.path.join(self.log_dir, filename)
+
+            if not os.path.isfile(path):
+                continue
+
+            modified = datetime.fromtimestamp(os.path.getmtime(path))
+
+            if now - modified > timedelta(days=log_retention_days):
+                os.remove(path)
+
+        # ----------------------------
+        # Purge old storyboard folders
+        # ----------------------------
+
+        storyboard_root = os.path.join(self.log_dir, "storyboards")
+
+        if not os.path.exists(storyboard_root):
+            return
+
+        for folder_name in os.listdir(storyboard_root):
+
+            folder_path = os.path.join(
+                storyboard_root,
+                folder_name
+            )
+
+            if not os.path.isdir(folder_path):
+                continue
+
+            modified = datetime.fromtimestamp(
+                os.path.getmtime(folder_path)
+            )
+
+            if now - modified > timedelta(days=storyboard_retention_days):
+                shutil.rmtree(folder_path)
 
     """ ### SEGMENT: LOGGING METHODS ###
     Standardized logging helpers for runtime, API, reward, motion, and storyboard events. """

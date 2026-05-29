@@ -7,6 +7,7 @@ CORE FLOW:
 - Buffer event frames while object motion is active
 - Track centroid movement as supporting evidence
 - Select a small ordered frame set for contact sheet generation
+- Reject weak/noisy sessions before expensive API analysis
 - Stay independent from OpenAI, reward logic, and UI concerns
 """
 
@@ -23,12 +24,16 @@ class event_session:
     def __init__(
         self,
         max_buffer_size=40,
-        min_frames=2,
+        min_frames=3,
+        min_duration_seconds=0.10,
+        min_path_distance=8.0,
         pre_event_target_count=4,
         event_target_count=8
     ):
         self.max_buffer_size = max_buffer_size
         self.min_frames = min_frames
+        self.min_duration_seconds = min_duration_seconds
+        self.min_path_distance = min_path_distance
         self.pre_event_target_count = pre_event_target_count
         self.event_target_count = event_target_count
 
@@ -43,7 +48,7 @@ class event_session:
         self.records = []
 
         self.best_record = None
-
+        self.rejection_reason = None
 
     # ================================
     # SESSION LIFECYCLE
@@ -58,6 +63,7 @@ class event_session:
         self.end_time = None
 
         self.best_record = None
+        self.rejection_reason = None
 
         self.records = []
         self.pre_event_records = self._copy_limited_records(
@@ -65,13 +71,11 @@ class event_session:
             limit=self.max_buffer_size
         )
 
-
     def end(self):
         self.active = False
         self.completed = True
         self.end_time = time.time()
         self.best_record = self._select_best_event_record()
-
 
     def reset(self):
         self.active = False
@@ -85,7 +89,7 @@ class event_session:
         self.records = []
 
         self.best_record = None
-
+        self.rejection_reason = None
 
     # ================================
     # UPDATE LOOP ENTRYPOINT
@@ -110,7 +114,8 @@ class event_session:
                 object_frame=object_frame,
                 centroid=centroid,
                 bbox=bbox,
-                area=area
+                area=area,
+                motion_detected=True
             )
             return "active"
 
@@ -120,24 +125,24 @@ class event_session:
                 object_frame=object_frame,
                 centroid=centroid,
                 bbox=bbox,
-                area=area
+                area=area,
+                motion_detected=False
             )
             self.end()
 
-            if self.has_records() and not self.ready_sent:
+            if self.is_viable() and not self.ready_sent:
                 self.ready_sent = True
                 return "ready"
 
-            return "complete"
+            return "rejected"
 
         return None
-
 
     # ================================
     # RECORD STORAGE
     # ================================
 
-    def _add_record(self, combined_frame, object_frame, centroid=None, bbox=None, area=None):
+    def _add_record(self, combined_frame, object_frame, centroid=None, bbox=None, area=None, motion_detected=True):
         record = {
             "timestamp": time.time(),
             "combined_frame": combined_frame.copy(),
@@ -145,6 +150,7 @@ class event_session:
             "centroid": centroid,
             "bbox": bbox,
             "area": area,
+            "motion_detected": motion_detected,
             "sharpness": self._calculate_sharpness(combined_frame),
             "source": "event"
         }
@@ -153,7 +159,6 @@ class event_session:
 
         if len(self.records) > self.max_buffer_size:
             self.records = self.records[-self.max_buffer_size:]
-
 
     def _copy_limited_records(self, records, limit):
         copied = []
@@ -188,7 +193,6 @@ class event_session:
 
         return copied
 
-
     # ================================
     # CONTACT SHEET FRAME SELECTION
     # ================================
@@ -205,7 +209,6 @@ class event_session:
 
         return selected
 
-
     def _select_pre_event_frames(self, records):
         if not records:
             return []
@@ -218,7 +221,6 @@ class event_session:
 
         selected = stable_records[:self.pre_event_target_count]
         return sorted(selected, key=lambda record: record["timestamp"])
-
 
     def _select_event_frames(self, records):
         if not records:
@@ -243,7 +245,6 @@ class event_session:
 
         selected = sharp_records[:self.event_target_count]
         return sorted(selected, key=lambda record: record["timestamp"])
-
 
     def _select_centroid_diverse_frames(self, records, target_count):
         if len(records) <= target_count:
@@ -286,7 +287,6 @@ class event_session:
 
         return sorted(selected, key=lambda record: record["timestamp"])
 
-
     def _evenly_sample(self, records, target_count):
         if len(records) <= target_count:
             return records
@@ -299,7 +299,6 @@ class event_session:
 
         return [records[index] for index in indexes]
 
-
     def _rank_by_sharpness_then_sample(self, records, target_count):
         sharp_records = sorted(
             records,
@@ -309,7 +308,6 @@ class event_session:
 
         selected = sharp_records[:target_count]
         return sorted(selected, key=lambda record: record["timestamp"])
-
 
     # ================================
     # BEST RECORD SUPPORT
@@ -337,15 +335,64 @@ class event_session:
 
         return max(self.records, key=lambda record: record.get("sharpness", 0))
 
-
     def get_best_record(self):
         return self.best_record
 
+    def get_first_stable_record(self):
+        for record in self.records:
+            if record.get("motion_detected") is False:
+                return record
+
+        if self.records:
+            return self.records[-1]
+
+        return None
+
+    # ================================
+    # VIABILITY FILTERS
+    # ================================
+
+    def is_viable(self):
+        if len(self.records) < self.min_frames:
+            self.rejection_reason = "too_few_frames"
+            return False
+
+        if self.get_duration_seconds() < self.min_duration_seconds:
+            self.rejection_reason = "too_short_duration"
+            return False
+
+        if self.get_event_path_length() < self.min_path_distance:
+            self.rejection_reason = "too_little_centroid_movement"
+            return False
+
+        self.rejection_reason = None
+        return True
+
+    def get_rejection_reason(self):
+        return self.rejection_reason
+
+    def get_duration_seconds(self):
+        if self.start_time is None:
+            return 0.0
+
+        end_time = self.end_time or time.time()
+        return max(0.0, end_time - self.start_time)
+
+    def get_event_path_length(self):
+        records_with_centroid = [
+            record for record in self.records
+            if record.get("centroid") is not None
+        ]
+
+        if len(records_with_centroid) < 2:
+            return 0.0
+
+        return self._calculate_path_length(records_with_centroid)
 
     # ================================
     # METRICS / HELPERS
     # ================================
-    
+
     def _estimate_motion_centroid(self, previous_frame, current_frame):
         if previous_frame is None or current_frame is None:
             return None
@@ -400,12 +447,10 @@ class event_session:
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         return cv2.Laplacian(gray, cv2.CV_64F).var()
 
-
     def _centroid_distance(self, record_a, record_b):
         ax, ay = record_a["centroid"]
         bx, by = record_b["centroid"]
         return math.hypot(bx - ax, by - ay)
-
 
     def _calculate_path_length(self, records):
         total = 0.0
@@ -415,7 +460,6 @@ class event_session:
 
         return total
 
-
     def _trajectory_midpoint(self, records):
         first = records[0]["centroid"]
         last = records[-1]["centroid"]
@@ -424,7 +468,6 @@ class event_session:
             (first[0] + last[0]) / 2,
             (first[1] + last[1]) / 2
         )
-
 
     def _dedupe_records(self, records):
         seen = set()
@@ -439,14 +482,13 @@ class event_session:
 
         return deduped
 
-
     # ================================
     # PUBLIC STATE ACCESS
     # ================================
 
     def has_records(self):
         return len(self.records) >= self.min_frames
-        
+
     def get_full_centroid_path(self):
         path = []
 
@@ -461,14 +503,11 @@ class event_session:
     def get_records(self):
         return self.records
 
-
     def get_pre_event_records(self):
         return self.pre_event_records
 
-
     def is_active(self):
         return self.active
-
 
     def is_complete(self):
         return self.completed
@@ -482,6 +521,8 @@ event_session.start(pre_event_records)
     ↓
 event_session buffers object-motion frames
     ↓
+event_session filters weak/noisy sessions
+    ↓
 event_session selects pre-event + event frames
     ↓
 contact_sheet_builder creates ordered grid
@@ -489,5 +530,5 @@ contact_sheet_builder creates ordered grid
 OpenAI analyzes sequence
 
 DESIGN INTENT:
-Centroid helps select useful event frames, but AI makes the final interpretation.
+Centroid helps select useful event frames and reject weak events, but AI makes the final interpretation.
 """

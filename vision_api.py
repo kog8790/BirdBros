@@ -117,7 +117,8 @@ Return ONLY valid JSON with these exact keys:
   "targetZoneVisible": true/false,
   "rewardable": true/false,
   "bestFrameIndex": integer or null,
-  "reason": "short explanation"
+  "reason": "short explanation",
+  "justification": "specific visual evidence supporting the decision"
 }}
 """.strip()
 
@@ -148,7 +149,8 @@ Return ONLY valid JSON with these exact keys:
             "targetZoneVisible": False,
             "rewardable": False,
             "bestFrameIndex": None,
-            "reason": "No valid API response"
+            "reason": "No valid API response",
+            "justification": ""
         }
 
         if not response:
@@ -167,7 +169,8 @@ Return ONLY valid JSON with these exact keys:
                 "targetZoneVisible": bool(data.get("targetZoneVisible", False)),
                 "rewardable": bool(data.get("rewardable", False)),
                 "bestFrameIndex": data.get("bestFrameIndex"),
-                "reason": data.get("reason") or ""
+                "reason": data.get("reason") or "",
+                "justification": data.get("justification") or ""
             }
 
         except Exception as e:

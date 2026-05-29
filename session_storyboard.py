@@ -41,12 +41,12 @@ class session_storyboard:
         self.final_outcome = None
         self.task_labels = {}
 
-    def start_session(self, opening_frame=None, notes="", task_labels=None):
-        self.reset()
+    def start_session(self, opening_frame=None, notes="", task_labels=None, rejected=False):
 
         self.active = True
         self.started_at = self._timestamp()
-        self.session_id = f"session_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+        prefix = "rejected_session" if rejected else "session"
+        self.session_id = (f"{prefix}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}")
         self.session_dir = os.path.join(self.root_dir, self.session_id)
         self.task_labels = task_labels or {}
 
@@ -167,7 +167,16 @@ class session_storyboard:
             return None
 
         self.event_counter += 1
-        filename = f"{self.event_counter:02d}_{self._slug(event_type)}_{suffix}.jpg"
+
+        safe_type = event_type.replace(" ", "_").lower()
+        timestamp_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
+        filename = (
+            f"{self.event_counter:02d}_"
+            f"{timestamp_str}_"
+            f"{safe_type}_"
+            f"{suffix}.jpg"
+        )
         path = os.path.join(self.session_dir, filename)
         cv2.imwrite(path, frame)
         return filename
