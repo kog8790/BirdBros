@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
+    QGridLayout,
     QFormLayout,
     QLabel,
     QPushButton,
@@ -40,12 +41,14 @@ class control_panel(QWidget):
     config_changed = Signal(dict)
     exit_requested = Signal()
     manual_capture_requested = Signal()
+    detection_paused_changed = Signal(bool)
 
     def __init__(self, config_path="birdbros_config.json"):
         super().__init__()
 
         self.config_path = config_path
         self.config = load_config(self.config_path)
+        self.detection_paused = True
 
         self.setWindowTitle("Bird Bros Control Panel")
         self._apply_responsive_window_size()
@@ -105,7 +108,7 @@ class control_panel(QWidget):
 
         video_group.setLayout(video_layout)
 
-        subject_group = QGroupBox("Subject ROI")
+        self.subject_group = QGroupBox("Subject ROI")
         subject_form = QFormLayout()
 
         self.subject_x = self._make_spinbox(0, 10000)
@@ -117,9 +120,9 @@ class control_panel(QWidget):
         subject_form.addRow("Y", self.subject_y)
         subject_form.addRow("W", self.subject_w)
         subject_form.addRow("H", self.subject_h)
-        subject_group.setLayout(subject_form)
+        self.subject_group.setLayout(subject_form)
 
-        object_group = QGroupBox("Object ROI")
+        self.object_group = QGroupBox("Trigger ROI")
         object_form = QFormLayout()
 
         self.object_x = self._make_spinbox(0, 10000)
@@ -131,17 +134,18 @@ class control_panel(QWidget):
         object_form.addRow("Y", self.object_y)
         object_form.addRow("W", self.object_w)
         object_form.addRow("H", self.object_h)
-        object_group.setLayout(object_form)
+        self.object_group.setLayout(object_form)
 
         motion_group = QGroupBox("Motion")
         motion_form = QFormLayout()
 
-        self.motion_min_area = self._make_spinbox(1, 1000000)
-        motion_form.addRow("Min Area", self.motion_min_area)
+        self.motion_min_area = self._make_spinbox(100, 50000)
+        motion_form.addRow("Motion Sensitivity", self.motion_min_area)
         motion_group.setLayout(motion_form)
 
         display_group = QGroupBox("Display")
-        display_layout = QVBoxLayout()
+        display_layout = QGridLayout()
+        display_layout.setSpacing(10)
 
         self.show_overlay = QCheckBox("Show Overlay")
         self.show_grid = QCheckBox("Show Grid")
@@ -149,15 +153,24 @@ class control_panel(QWidget):
         self.show_capture_border = QCheckBox("Show Capture Border")
         self.show_labels = QCheckBox("Show Labels")
 
-        display_layout.addWidget(self.show_overlay)
-        display_layout.addWidget(self.show_grid)
-        display_layout.addWidget(self.show_coords)
-        display_layout.addWidget(self.show_capture_border)
-        display_layout.addWidget(self.show_labels)
+        display_layout.addWidget(self.show_overlay, 0, 0)
+        display_layout.addWidget(self.show_grid, 0, 1)
+        display_layout.addWidget(self.show_coords, 0, 2)
+
+        display_layout.addWidget(self.show_capture_border, 1, 0)
+        display_layout.addWidget(self.show_labels, 1, 1)
         display_group.setLayout(display_layout)
 
         task_group = QGroupBox("AI Task Labels")
         task_form = QFormLayout()
+
+        self.behavior_mode = QComboBox()
+        self.behavior_mode.addItems(["simple", "advanced"])
+
+        self.reward_description = QLineEdit()
+        self.reward_description.setPlaceholderText(
+            "A bird drops litter into a receptacle."
+        )
 
         self.subject_label = QLineEdit()
         self.object_label = QLineEdit()
@@ -169,10 +182,24 @@ class control_panel(QWidget):
         self.target_zone_label.setPlaceholderText("trash receptacle")
         self.action_label.setPlaceholderText("depositing")
 
-        task_form.addRow("Subject", self.subject_label)
-        task_form.addRow("Object", self.object_label)
-        task_form.addRow("Target Zone", self.target_zone_label)
-        task_form.addRow("Action", self.action_label)
+        self.subject_label_widget = QLabel("Subject")
+        self.object_label_widget = QLabel("Object")
+        self.target_zone_label_widget = QLabel("Target Zone")
+        self.action_label_widget = QLabel("Action")
+
+        task_form.addRow("Behavior Mode", self.behavior_mode)
+
+        reward_when_label = QLabel("Reward When")
+        reward_when_label.setAlignment(Qt.AlignLeft)
+
+        task_form.addRow(reward_when_label)
+        task_form.addRow(self.reward_description)
+
+        task_form.addRow(self.subject_label_widget, self.subject_label)
+        task_form.addRow(self.object_label_widget, self.object_label)
+        task_form.addRow(self.target_zone_label_widget, self.target_zone_label)
+        task_form.addRow(self.action_label_widget, self.action_label)
+
         task_group.setLayout(task_form)
 
         reward_group = QGroupBox("Reward Action")
@@ -244,31 +271,35 @@ class control_panel(QWidget):
 
         reward_group.setLayout(reward_layout)
 
-        button_row = QVBoxLayout()
+        button_grid = QGridLayout()
+        button_grid.setSpacing(10)
 
+        self.start_pause_button = QPushButton("Start Detection")
         self.save_button = QPushButton("Save Config")
         self.reload_button = QPushButton("Reload Config")
         self.reset_button = QPushButton("Reset Defaults")
         self.manual_capture_button = QPushButton("Manual ROI Capture")
         self.exit_button = QPushButton("Exit")
 
-        button_row.addWidget(self.save_button)
-        button_row.addWidget(self.reload_button)
-        button_row.addWidget(self.reset_button)
-        button_row.addWidget(self.manual_capture_button)
-        button_row.addWidget(self.exit_button)
+        button_grid.addWidget(self.start_pause_button, 0, 0)
+        button_grid.addWidget(self.save_button, 0, 1)
+        button_grid.addWidget(self.reload_button, 0, 2)
+
+        button_grid.addWidget(self.reset_button, 1, 0)
+        button_grid.addWidget(self.manual_capture_button, 1, 1)
+        button_grid.addWidget(self.exit_button, 1, 2)
 
         self.status_label = QLabel("Ready")
 
         main_layout.addWidget(capture_group)
         main_layout.addWidget(video_group)
-        main_layout.addWidget(subject_group)
-        main_layout.addWidget(object_group)
+        main_layout.addWidget(self.subject_group)
+        main_layout.addWidget(self.object_group)
         main_layout.addWidget(motion_group)
         main_layout.addWidget(display_group)
         main_layout.addWidget(task_group)
         main_layout.addWidget(reward_group)
-        main_layout.addLayout(button_row)
+        main_layout.addLayout(button_grid)
         main_layout.addWidget(self.status_label)
 
         content_widget = QWidget()
@@ -341,6 +372,7 @@ class control_panel(QWidget):
         for widget in lineedits:
             widget.textChanged.connect(self._on_widget_changed)
 
+        self.start_pause_button.clicked.connect(self._on_start_pause_clicked)
         self.save_button.clicked.connect(self.save_config)
         self.reload_button.clicked.connect(self.reload_config)
         self.reset_button.clicked.connect(self.reset_defaults)
@@ -408,6 +440,18 @@ class control_panel(QWidget):
         self.config = self.get_current_config()
         self.status_label.setText("Unsaved changes")
         self.emit_config()
+        
+    def _on_start_pause_clicked(self):
+        self.detection_paused = not self.detection_paused
+
+        if self.detection_paused:
+            self.start_pause_button.setText("Start Detection")
+            self.status_label.setText("Detection paused")
+        else:
+            self.start_pause_button.setText("Pause Detection")
+            self.status_label.setText("Detection running")
+
+        self.detection_paused_changed.emit(self.detection_paused)
 
     def _on_exit_clicked(self):
         self.exit_requested.emit()
@@ -449,6 +493,32 @@ class control_panel(QWidget):
     # ================================
     # DYNAMIC VIDEO INPUT UI
     # ================================
+    
+    def _on_behavior_mode_changed(self):
+        advanced_visible = (
+            self.behavior_mode.currentText() == "advanced"
+        )
+
+        self.subject_label_widget.setVisible(advanced_visible)
+        self.subject_label.setVisible(advanced_visible)
+
+        self.object_label_widget.setVisible(advanced_visible)
+        self.object_label.setVisible(advanced_visible)
+
+        self.target_zone_label_widget.setVisible(advanced_visible)
+        self.target_zone_label.setVisible(advanced_visible)
+
+        self.action_label_widget.setVisible(advanced_visible)
+        self.action_label.setVisible(advanced_visible)
+
+        self.subject_group.setVisible(advanced_visible)
+
+        if advanced_visible:
+            self.object_group.setTitle("Object ROI")
+        else:
+            self.object_group.setTitle("Trigger ROI")
+
+        self._on_widget_changed()
 
     def _on_video_input_changed(self):
         input_mode = self.video_mode.currentText()
@@ -514,6 +584,11 @@ class control_panel(QWidget):
                 "target_zone_label": self._line_value(self.target_zone_label, default_task["target_zone_label"]),
                 "action_label": self._line_value(self.action_label, default_task["action_label"])
             },
+
+            "behavior_mode": self.behavior_mode.currentText(),
+
+            "reward_description": self.reward_description.text().strip(),
+
             "reward_action": {
                 "mode": self.reward_mode.currentText(),
                 "x": self.reward_x.value(),
@@ -567,8 +642,8 @@ class control_panel(QWidget):
         self.object_w.setValue(pct_to_px(cfg["object_roi"]["w_pct"], region["width"]))
         self.object_h.setValue(pct_to_px(cfg["object_roi"]["h_pct"], region["height"]))
 
-        self.motion_min_area.setValue(cfg["motion"]["min_area"])
-
+        self.motion_min_area.setValue(max(100, min(50000, cfg["motion"]["min_area"])))
+        
         display = cfg.get("display", {})
         self.show_overlay.setChecked(display.get("show_overlay", True))
         self.show_grid.setChecked(display.get("show_grid", True))
@@ -577,6 +652,16 @@ class control_panel(QWidget):
         self.show_labels.setChecked(display.get("show_labels", True))
 
         task = cfg.get("task_labels", DEFAULT_CONFIG["task_labels"])
+        self.behavior_mode.setCurrentText(
+            cfg.get("behavior_mode", "advanced")
+        )
+
+        self.reward_description.setText(
+            cfg.get("reward_description", "")
+        )
+
+        self._on_behavior_mode_changed()
+
         self.subject_label.setText(task.get("subject_label", DEFAULT_CONFIG["task_labels"]["subject_label"]))
         self.object_label.setText(task.get("object_label", DEFAULT_CONFIG["task_labels"]["object_label"]))
         self.target_zone_label.setText(task.get("target_zone_label", DEFAULT_CONFIG["task_labels"]["target_zone_label"]))

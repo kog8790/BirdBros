@@ -5,6 +5,12 @@
     "width": 900,
     "height": 700
   },
+  "video_input": {
+    "mode": "screen_capture",
+    "video_path": "",
+    "loop_video": true,
+    "fps": 30
+  },
   "subject_roi": {
     "x_pct": 0.5722222222222222,
     "y_pct": 0.14285714285714285,
@@ -33,8 +39,10 @@
     "target_zone_label": "trash receptacle",
     "action_label": "depositing"
   },
+  "behavior_mode": "simple",
+  "reward_description": "A bird drops litter into a receptacle.",
   "reward_action": {
-    "mode": "webhook",
+    "mode": "debug_popup",
     "x": 735,
     "y": 586,
     "clicks": 3,

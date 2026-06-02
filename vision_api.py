@@ -122,6 +122,38 @@ Return ONLY valid JSON with these exact keys:
 }}
 """.strip()
 
+    def build_simple_behavior_prompt(self, reward_description: str) -> str:
+
+        return f"""
+You are analyzing a numbered contact sheet of sequential frames.
+
+FRAME ORDER:
+- Read left-to-right, top-to-bottom.
+- Earlier frames appear first.
+- Later frames appear last.
+
+DESIRED BEHAVIOR:
+
+{reward_description}
+
+Determine whether the desired behavior is occurring.
+
+IMPORTANT:
+- Evaluate the entire sequence.
+- Do not require perfect certainty.
+- Use common-sense interpretation of the behavior.
+- Focus on whether the sequence generally matches the desired behavior.
+
+Return ONLY valid JSON:
+
+{{
+"rewardable": true/false,
+"bestFrameIndex": integer or null,
+"reason": "short explanation",
+"justification": "specific visual evidence supporting the decision"
+}}
+""".strip()
+
     def analyze_event_contact_sheet(
         self,
         image_bytes: bytes,

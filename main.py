@@ -85,32 +85,13 @@ def main():
     api_key = os.getenv("OPENAI_API_KEY")
 
     if not api_key:
+        api_key = input("Enter your OpenAI API Key: ").strip()
 
-        from PyQt6.QtWidgets import (
-            QInputDialog,
-            QMessageBox
-        )
-
-        api_key, ok = QInputDialog.getText(
-            None,
-            "Bird Bros Setup",
-            "Enter your OpenAI API Key:"
-        )
-
-        if not ok or not api_key.strip():
-            QMessageBox.critical(
-                None,
-                "Bird Bros",
-                "An OpenAI API Key is required."
-            )
-            return
+        if not api_key:
+            raise ValueError("OPENAI_API_KEY is required")
 
         with open(".env", "w") as env_file:
-            env_file.write(
-                f"OPENAI_API_KEY={api_key.strip()}\n"
-            )
-
-        api_key = api_key.strip()
+            env_file.write(f"OPENAI_API_KEY={api_key}\n")
 
     vision = vision_api(api_key=api_key)
     logger = Logger()
@@ -124,6 +105,7 @@ def main():
     current_config = panel.get_current_config()
 
     manual_capture_requested = False
+    detection_paused = True
 
     action = resulting_action(config=current_config)
     storyboard = session_storyboard(logger=logger)
@@ -181,7 +163,7 @@ def main():
     warmup_seconds = 3.0
     warmup_complete_logged = False
 
-    current_event_text = "Warmup"
+    current_event_text = "Paused"
     prev_object_motion = False
 
     prev_region = region.copy()
@@ -226,6 +208,29 @@ def main():
         recent_event_paths.clear()
 
         prev_object_motion = False
+        
+    def on_detection_paused_changed(paused):
+        nonlocal detection_paused
+        nonlocal current_event_text
+        nonlocal prev_object_motion
+
+        detection_paused = paused
+
+        if detection_paused:
+            current_event_text = "Paused"
+            object_tracker.reset()
+            deposit_event_manager.reset()
+            prev_object_motion = False
+
+            if storyboard.active:
+                storyboard.abort(notes="Storyboard aborted because detection was paused.")
+        else:
+            reset_runtime_state(
+                event_text="Warmup",
+                storyboard_abort_note="Storyboard aborted because detection was restarted."
+            )
+
+    panel.detection_paused_changed.connect(on_detection_paused_changed)
 
     def finalize_storyboard_if_active(
         rewarded=False,
@@ -388,36 +393,102 @@ def main():
             region_w = region["width"]
             region_h = region["height"]
 
+            behavior_mode = current_config.get(
+                "behavior_mode",
+                "advanced"
+            )
+
             subject_roi = current_config["subject_roi"]
             object_roi = current_config["object_roi"]
 
             """ ### SEGMENT: ROI PROCESSING ###
-            Converts subject/object ROI percentages into pixel boxes, then builds
-            one combined crop used for contact sheet event analysis. """
+            Simple Mode:
+                - Full capture region becomes AI context.
+                - Object ROI becomes trigger zone.
 
-            subject_box = bound_box_define(
-                x=int(subject_roi["x_pct"] * region_w),
-                y=int(subject_roi["y_pct"] * region_h),
-                w=int(subject_roi["w_pct"] * region_w),
-                h=int(subject_roi["h_pct"] * region_h),
-                label="subject"
-            )
+            Advanced Mode:
+                - Subject ROI + Object ROI build combined AI context.
+            """
 
-            object_box = bound_box_define(
-                x=int(object_roi["x_pct"] * region_w),
-                y=int(object_roi["y_pct"] * region_h),
-                w=int(object_roi["w_pct"] * region_w),
-                h=int(object_roi["h_pct"] * region_h),
-                label="object"
-            )
+            if behavior_mode == "simple":
 
-            subject_box = clamp_roi_to_frame(subject_box, frame_w, frame_h)
-            object_box = clamp_roi_to_frame(object_box, frame_w, frame_h)
-            combined_box = build_combined_box(subject_box, object_box, frame_w, frame_h, padding=0)
+                object_box = bound_box_define(
+                    x=int(object_roi["x_pct"] * region_w),
+                    y=int(object_roi["y_pct"] * region_h),
+                    w=int(object_roi["w_pct"] * region_w),
+                    h=int(object_roi["h_pct"] * region_h),
+                    label="trigger"
+                )
 
-            subject_crop = crop_from_box(frame, subject_box)
-            object_crop = crop_from_box(frame, object_box)
-            combined_crop = crop_from_box(frame, combined_box)
+                object_box = clamp_roi_to_frame(
+                    object_box,
+                    frame_w,
+                    frame_h
+                )
+
+                subject_box = None
+                combined_box = None
+
+                object_crop = crop_from_box(
+                    frame,
+                    object_box
+                )
+
+                subject_crop = frame.copy()
+                combined_crop = frame.copy()
+
+            else:
+
+                subject_box = bound_box_define(
+                    x=int(subject_roi["x_pct"] * region_w),
+                    y=int(subject_roi["y_pct"] * region_h),
+                    w=int(subject_roi["w_pct"] * region_w),
+                    h=int(subject_roi["h_pct"] * region_h),
+                    label="subject"
+                )
+
+                object_box = bound_box_define(
+                    x=int(object_roi["x_pct"] * region_w),
+                    y=int(object_roi["y_pct"] * region_h),
+                    w=int(object_roi["w_pct"] * region_w),
+                    h=int(object_roi["h_pct"] * region_h),
+                    label="object"
+                )
+
+                subject_box = clamp_roi_to_frame(
+                    subject_box,
+                    frame_w,
+                    frame_h
+                )
+
+                object_box = clamp_roi_to_frame(
+                    object_box,
+                    frame_w,
+                    frame_h
+                )
+
+                combined_box = build_combined_box(
+                    subject_box,
+                    object_box,
+                    frame_w,
+                    frame_h,
+                    padding=0
+                )
+
+                subject_crop = crop_from_box(
+                    frame,
+                    subject_box
+                )
+
+                object_crop = crop_from_box(
+                    frame,
+                    object_box
+                )
+
+                combined_crop = crop_from_box(
+                    frame,
+                    combined_box
+                )
 
             """ ### SEGMENT: ALWAYS-ON RING BUFFER ###
             Stores recent pre-event frames so new event sessions can include context
@@ -455,6 +526,45 @@ def main():
 
                 manual_capture_requested = False
 
+            if detection_paused:
+                current_event_text = "Paused"
+
+                if show_overlay:
+                    overlay_frame = drawer.make_overlay_canvas(frame_w, frame_h)
+                    overlay_frame = drawer.draw_event_banner(overlay_frame, "Paused")
+
+                    if show_capture_border:
+                        overlay_frame = drawer.draw_capture_border(overlay_frame, label="Capture Region")
+
+                    if show_grid:
+                        overlay_frame = drawer.draw_grid(overlay_frame, step=100)
+
+                    boxes_to_draw = [box for box in [subject_box, object_box] if box is not None]
+
+                    labels_to_draw = None
+                    if show_labels:
+                        labels_to_draw = ["trigger ROI | paused"] if behavior_mode == "simple" else ["subject context", "object ROI | paused"]
+
+                    colors_to_draw = (
+                        [(255, 0, 0, 255)]
+                        if behavior_mode == "simple"
+                        else [(0, 255, 0, 255), (255, 0, 0, 255)]
+                    )
+
+                    overlay_frame = drawer.draw_boxes(
+                        overlay_frame,
+                        boxes_to_draw,
+                        labels=labels_to_draw,
+                        colors=colors_to_draw,
+                        show_coords=show_coords
+                    )
+                else:
+                    overlay_frame = drawer.make_overlay_canvas(frame_w, frame_h)
+
+                overlay.update_frame(overlay_frame)
+                time.sleep(1 / 60)
+                continue
+
             """ ### SEGMENT: OBJECT MOTION TRACKING ###
             Converts object ROI frame differences into centroid/bbox detections.
             Multiple detections can be assigned to separate event sessions. """
@@ -485,7 +595,7 @@ def main():
 
                     overlay_frame = drawer.draw_boxes(
                         overlay_frame,
-                        [subject_box, object_box],
+                        boxes_to_draw = [box for box in [subject_box, object_box] if box is not None],
                         labels=labels_to_draw,
                         colors=[(0, 255, 0, 255), (255, 0, 0, 255)],
                         show_coords=show_coords
@@ -630,12 +740,37 @@ def main():
                         current_event_text = "Sending Contact Sheet To OpenAI"
 
                         contact_sheet_bytes = encode_frame_to_jpeg_bytes(contact_sheet)
+
+                        behavior_mode = current_config.get(
+                            "behavior_mode",
+                            "advanced"
+                        )
+
+                        reward_description = current_config.get(
+                            "reward_description",
+                            ""
+                        )
+
                         deposit_result = vision.analyze_event_contact_sheet(
                             image_bytes=contact_sheet_bytes,
-                            subject_label=task_labels.get("subject_label", "non-human animal"),
-                            object_label=task_labels.get("object_label", "man-made litter or trash"),
-                            target_zone_label=task_labels.get("target_zone_label", "trash receptacle"),
-                            action_label=task_labels.get("action_label", "depositing")
+                            subject_label=task_labels.get(
+                                "subject_label",
+                                "non-human animal"
+                            ),
+                            object_label=task_labels.get(
+                                "object_label",
+                                "man-made litter or trash"
+                            ),
+                            target_zone_label=task_labels.get(
+                                "target_zone_label",
+                                "trash receptacle"
+                            ),
+                            action_label=task_labels.get(
+                                "action_label",
+                                "depositing"
+                            ),
+                            behavior_mode=behavior_mode,
+                            reward_description=reward_description
                         )
 
                         subject_present = deposit_result["subjectPresent"]
@@ -736,7 +871,7 @@ def main():
 
                 overlay_frame = drawer.draw_boxes(
                     overlay_frame,
-                    [subject_box, object_box],
+                    boxes_to_draw = [box for box in [subject_box, object_box] if box is not None],
                     labels=labels_to_draw,
                     colors=[(0, 255, 0, 255), (255, 0, 0, 255)],
                     show_coords=show_coords
