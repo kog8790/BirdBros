@@ -8,6 +8,7 @@ RESPONSIBILITIES:
 - Store API results and final outcome
 - Write story.json and story.txt
 - Preserve task labels used for each event
+- Rename API-attempt storyboard folders by final outcome for faster review
 
 DESIGN INTENT:
 Make every decision reviewable: what the system saw, what prompt labels it used,
@@ -40,13 +41,17 @@ class session_storyboard:
         self.event_counter = 0
         self.final_outcome = None
         self.task_labels = {}
+        self.rejected_session = False
+        self.folder_outcome_type = None
 
     def start_session(self, opening_frame=None, notes="", task_labels=None, rejected=False):
-
         self.active = True
         self.started_at = self._timestamp()
-        prefix = "rejected_session" if rejected else "session"
-        self.session_id = (f"{prefix}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}")
+        self.rejected_session = bool(rejected)
+        self.folder_outcome_type = "Rejected" if self.rejected_session else "API_Pending"
+
+        prefix = "rejected_session" if self.rejected_session else "API_Pending"
+        self.session_id = f"{prefix}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
         self.session_dir = os.path.join(self.root_dir, self.session_id)
         self.task_labels = task_labels or {}
 
@@ -88,6 +93,7 @@ class session_storyboard:
         )
 
         self.ended_at = self._timestamp()
+        self._rename_api_session_folder_for_outcome(rewarded=rewarded, label=label)
         self._write_story_files()
 
         if self.logger:
@@ -182,6 +188,101 @@ class session_storyboard:
         return filename
 
     # ================================
+    # FOLDER NAMING
+    # ================================
+
+    def _rename_api_session_folder_for_outcome(self, rewarded: bool, label: str = ""):
+        """
+        Rejected events already start with rejected_session_* and should stay that way.
+
+        API-attempt sessions start as API_Pending_* because the final result is not known
+        when the storyboard begins. Once finalized, rename the whole folder so Finder-level
+        browsing immediately shows the result type:
+
+        - API_Rewarded_YYYY-MM-DD_HH-MM-SS
+        - API_Not_Rewarded_YYYY-MM-DD_HH-MM-SS
+        - API_Aborted_YYYY-MM-DD_HH-MM-SS
+        """
+        if self.rejected_session or not self.session_dir or not self.session_id:
+            return
+
+        label_text = str(label or "").strip().lower()
+
+        if rewarded:
+            outcome_prefix = "API_Rewarded"
+            self.folder_outcome_type = "API_Rewarded"
+        elif label_text == "aborted":
+            outcome_prefix = "API_Aborted"
+            self.folder_outcome_type = "API_Aborted"
+        else:
+            outcome_prefix = "API_Not_Rewarded"
+            self.folder_outcome_type = "API_Not_Rewarded"
+
+        started_stamp = self._session_started_stamp_for_filename()
+        desired_session_id = f"{outcome_prefix}_{started_stamp}"
+        desired_session_dir = os.path.join(self.root_dir, desired_session_id)
+
+        if os.path.abspath(desired_session_dir) == os.path.abspath(self.session_dir):
+            self.session_id = desired_session_id
+            return
+
+        final_session_id, final_session_dir = self._unique_session_path(
+            desired_session_id,
+            desired_session_dir
+        )
+
+        old_session_id = self.session_id
+        old_session_dir = self.session_dir
+
+        try:
+            os.rename(old_session_dir, final_session_dir)
+            self.session_id = final_session_id
+            self.session_dir = final_session_dir
+
+            if self.logger:
+                self.logger.log_info(
+                    "Storyboard folder renamed for final outcome",
+                    old_session_id=old_session_id,
+                    new_session_id=self.session_id,
+                    outcome_type=self.folder_outcome_type,
+                    story_dir=self.session_dir
+                )
+
+        except OSError as e:
+            if self.logger:
+                self.logger.log_warning(
+                    "Could not rename storyboard folder for final outcome",
+                    old_session_id=old_session_id,
+                    desired_session_id=final_session_id,
+                    error=str(e)
+                )
+
+    def _session_started_stamp_for_filename(self):
+        if self.started_at:
+            return (
+                self.started_at
+                .replace("T", "_")
+                .replace(":", "-")
+                .replace(".", "-")
+            )
+
+        return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
+    def _unique_session_path(self, session_id, session_dir):
+        if not os.path.exists(session_dir):
+            return session_id, session_dir
+
+        counter = 2
+        while True:
+            candidate_id = f"{session_id}_{counter:02d}"
+            candidate_dir = os.path.join(self.root_dir, candidate_id)
+
+            if not os.path.exists(candidate_dir):
+                return candidate_id, candidate_dir
+
+            counter += 1
+
+    # ================================
     # STORY FILE WRITING
     # ================================
 
@@ -193,6 +294,7 @@ class session_storyboard:
             "session_id": self.session_id,
             "started_at": self.started_at,
             "ended_at": self.ended_at,
+            "folder_outcome_type": self.folder_outcome_type,
             "task_labels": self.task_labels,
             "final_outcome": self.final_outcome,
             "events": self.events
@@ -206,7 +308,8 @@ class session_storyboard:
         with open(txt_path, "w", encoding="utf-8") as f:
             f.write(f"Bird Bros Storyboard | {self.session_id}\n\n")
             f.write(f"Started: {self.started_at}\n")
-            f.write(f"Ended: {self.ended_at}\n\n")
+            f.write(f"Ended: {self.ended_at}\n")
+            f.write(f"Folder Outcome Type: {self.folder_outcome_type}\n\n")
 
             if self.task_labels:
                 f.write("Task Labels:\n")
@@ -274,7 +377,10 @@ session_storyboard.start_session()
     ↓
 add_event() saves contact sheets / frames
     ↓
+finalize() renames API-attempt folders by outcome
+    ↓
 finalize() writes story.json + story.txt
 
 DESIGN INTENT:
 Storyboards preserve enough context to debug AI decisions after the run. """
+

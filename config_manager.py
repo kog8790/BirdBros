@@ -70,6 +70,8 @@ DEFAULT_CONFIG = {
         "target_zone_label": "trash receptacle",
         "action_label": "depositing"
     },
+    "behavior_mode": "advanced",
+    "reward_description": "A bird drops litter into a receptacle.",
     "reward_action": {
         "mode": "debug_popup",
         "x": 735,

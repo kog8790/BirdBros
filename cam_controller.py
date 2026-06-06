@@ -54,21 +54,32 @@ class cam_controller:
         self.loop_video = loop_video
 
         self.video_capture = None
+        self.sct = None
 
-        self.sct = mss.mss()
+        if self.input_mode == "screen_capture":
+            self.sct = mss.mss()
 
-        if self.input_mode == "video_file":
+        elif self.input_mode == "video_file":
 
             if not Path(self.video_path).exists():
                 raise FileNotFoundError(f"Video file not found: {self.video_path}")
 
             self.video_capture = cv2.VideoCapture(self.video_path)
 
+            if not self.video_capture.isOpened():
+                raise ValueError(f"Unable to open video file: {self.video_path}")
+
+        else:
+            raise ValueError(f"Unsupported input_mode: {self.input_mode}")
+
     """ ### SEGMENT: FRAME CAPTURE ###
     get_frame():
     Captures screen region via mss and returns BGR numpy frame (H, W, 3)."""
     def get_frame(self):
         if self.input_mode == "screen_capture":
+
+            if self.sct is None:
+                self.sct = mss.mss()
 
             screenshot = self.sct.grab(self.capture_region)
 
@@ -99,6 +110,11 @@ class cam_controller:
 
         if self.video_capture is not None:
             self.video_capture.release()
+            self.video_capture = None
+
+        if self.sct is not None:
+            self.sct.close()
+            self.sct = None
 
 
 

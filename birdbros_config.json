@@ -1,8 +1,8 @@
 {
   "capture_region": {
-    "left": 100,
+    "left": 335,
     "top": 100,
-    "width": 900,
+    "width": 725,
     "height": 700
   },
   "video_input": {
@@ -12,19 +12,19 @@
     "fps": 30
   },
   "subject_roi": {
-    "x_pct": 0.5722222222222222,
+    "x_pct": 0.7103448275862069,
     "y_pct": 0.14285714285714285,
-    "w_pct": 0.3888888888888889,
+    "w_pct": 0.4827586206896552,
     "h_pct": 0.35714285714285715
   },
   "object_roi": {
-    "x_pct": 0.6666666666666666,
-    "y_pct": 0.3157142857142857,
-    "w_pct": 0.25,
-    "h_pct": 0.15714285714285714
+    "x_pct": 0.5172413793103449,
+    "y_pct": 0.32142857142857145,
+    "w_pct": 0.27586206896551724,
+    "h_pct": 0.14285714285714285
   },
   "motion": {
-    "min_area": 1500
+    "min_area": 6000
   },
   "display": {
     "show_overlay": true,
@@ -42,7 +42,7 @@
   "behavior_mode": "simple",
   "reward_description": "A bird drops litter into a receptacle.",
   "reward_action": {
-    "mode": "debug_popup",
+    "mode": "overlay_status",
     "x": 735,
     "y": 586,
     "clicks": 3,

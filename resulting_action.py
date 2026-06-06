@@ -22,8 +22,6 @@ Abstract reward behavior so different implementations (clicks, webhooks, etc.)
 can be swapped without changing core logic.                                 """
 
 
-import threading
-import tkinter as tk
 import subprocess
 import shlex
 from typing import Optional
@@ -62,9 +60,9 @@ class resulting_action:
     def _dispatch(self, action_config: dict, label: str, is_reward: bool):
         mode = action_config.get("mode", "debug_popup").strip().lower()
 
-        if mode == "debug_popup":
-            if is_reward:
-                self._show_reward_popup(label)
+        if mode in ("debug_popup", "overlay_status"):
+            event_type = "reward" if is_reward else "no_reward"
+            print(f"[ACTION] Overlay status mode: {event_type} | label={label}")
             return
 
         if mode == "mouse_click":
@@ -83,9 +81,7 @@ class resulting_action:
             self._shell_command_action(action_config, label, is_reward)
             return
 
-        print(f"[ACTION] Unknown mode '{mode}'. Falling back to debug popup.")
-        if is_reward:
-            self._show_reward_popup(label)
+        print(f"[ACTION] Unknown mode '{mode}'. No action performed.")
 
     def _mouse_click_action(self, action_config: dict, label: str):
         if pyautogui is None:
@@ -175,24 +171,7 @@ class resulting_action:
             subprocess.run(shlex.split(command), check=False)
         except Exception as e:
             print(f"[ACTION] Shell command failed: {e}")
-
-    def _show_reward_popup(self, label: str):
-        def show_popup():
-            root = tk.Tk()
-            root.title("Reward")
-            root.geometry("300x100")
-            label_widget = tk.Label(
-                root,
-                text=f"{label}! You get a reward!",
-                font=("Helvetica", 14)
-            )
-            label_widget.pack(pady=20)
-            root.after(3000, root.destroy)
-            root.mainloop()
-
-        threading.Thread(target=show_popup, daemon=True).start()
-        
-        
+                
         
 """                ### SEGMENT: SYSTEM CONTEXT ###
 FLOW:
@@ -208,3 +187,4 @@ external effect (treat dispense, feedback, etc.)
 DESIGN INTENT:
 Keep all side-effect logic isolated from detection and decision-making layers.
 """
+

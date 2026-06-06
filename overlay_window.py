@@ -23,6 +23,7 @@ Separate visualization from processing so the system can run headless or with UI
 """
 
 import sys
+import cv2
 import numpy as np
 from PySide6.QtCore import Qt, QRect
 from PySide6.QtGui import QGuiApplication, QImage, QPainter
@@ -77,6 +78,7 @@ class overlay_window(QWidget):
     def update_frame(self, frame_rgba: np.ndarray):
         """
         Accepts a numpy RGBA image of shape (h, w, 4), dtype uint8.
+        Resizes display input to current overlay geometry instead of crashing.
         """
         if frame_rgba is None:
             return
@@ -91,9 +93,12 @@ class overlay_window(QWidget):
             raise ValueError("overlay frame must have shape (height, width, 4)")
 
         expected_shape = (self.height_value, self.width_value, 4)
+
         if frame_rgba.shape != expected_shape:
-            raise ValueError(
-                f"overlay frame shape {frame_rgba.shape} does not match expected {expected_shape}"
+            frame_rgba = cv2.resize(
+                frame_rgba,
+                (self.width_value, self.height_value),
+                interpolation=cv2.INTER_NEAREST
             )
 
         self.overlay_frame = frame_rgba.copy()

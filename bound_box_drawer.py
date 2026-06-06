@@ -64,7 +64,12 @@ class bound_box_drawer:
     draw_event_banner():
     Displays current system state (e.g., Warmup, Motion Detected, Reward)."""
         
-    def draw_event_banner(self, canvas, message: str):
+    def draw_event_banner(
+        self,
+        canvas,
+        message: str,
+        previous_session_status: str = ""
+    ):
         if not message:
             message = "Idle"
 
@@ -91,6 +96,31 @@ class bound_box_drawer:
             2,
             cv2.LINE_AA
         )
+
+        if previous_session_status:
+
+            status_text = (f"Prev Session: {previous_session_status}")
+
+            text_size = cv2.getTextSize(
+                status_text,
+                self.font,
+                0.7,
+                2
+            )[0]
+
+            cv2.putText(
+                canvas,
+                status_text,
+                (
+                    w - text_size[0] - 12,
+                    int(self.banner_height * 0.65)
+                ),
+                self.font,
+                0.7,
+                self.text_color,
+                2,
+                cv2.LINE_AA
+            )
 
         return canvas
         

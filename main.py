@@ -27,10 +27,12 @@ from bound_box_define import bound_box_define
 from bound_box_drawer import bound_box_drawer
 from motion_object_tracker import motion_object_tracker
 from event_session_manager import event_session_manager
+from frame_change_analyzer import frame_change_analyzer
 from contact_sheet_builder import contact_sheet_builder
 from vision_api import vision_api
 from resulting_action import resulting_action
 from overlay_window import overlay_window, get_or_create_qt_app
+from status_window import status_window
 from control_panel import control_panel
 from logger import Logger
 from session_storyboard import session_storyboard
@@ -140,9 +142,29 @@ def main():
         height=region["height"]
     )
 
-    video_config = current_config.get("video_input", {})
+    status = status_window(
+        left=region["left"],
+        top=max(0, region["top"] - 52),
+        width=max(560, region["width"]),
+        height=42
+    )
 
-    cam = cam_controller(
+    video_config = current_config.get("video_input", {}).copy()
+
+    def create_camera(active_region, active_video_config):
+        return cam_controller(
+            capture_region=active_region.copy(),
+            fps=active_video_config.get("fps", 6),
+            input_mode=active_video_config.get("mode", "screen_capture"),
+            video_path=active_video_config.get("video_path", ""),
+            loop_video=active_video_config.get("loop_video", True)
+        )
+
+    cam = create_camera(region, video_config)
+
+    # Original constructor retained below by replacement guard.
+    if False:
+        cam = cam_controller(
         capture_region=region,
         fps=video_config.get("fps", 30),
         input_mode=video_config.get("mode", "screen_capture"),
@@ -154,6 +176,7 @@ def main():
 
     motion_min_area = current_config["motion"]["min_area"]
     object_tracker = motion_object_tracker(min_area=motion_min_area)
+    change_analyzer = frame_change_analyzer()
     deposit_event_manager = event_session_manager(distance_threshold=125, max_missing_frames=12)
     sheet_builder = contact_sheet_builder(cell_width=220, cell_height=220, padding=6, show_index=True)
     frame_ring_buffer = deque(maxlen=30)
@@ -164,9 +187,11 @@ def main():
     warmup_complete_logged = False
 
     current_event_text = "Paused"
+    previous_session_status = "None"
     prev_object_motion = False
 
     prev_region = region.copy()
+    prev_video_config = video_config.copy()
     prev_motion_min_area = motion_min_area
     prev_subject_roi = current_config["subject_roi"].copy()
     prev_object_roi = current_config["object_roi"].copy()
@@ -188,11 +213,14 @@ def main():
     panel.show()
     panel.raise_()
     panel.activateWindow()
+
+    status.keep_on_top()
     
     def reset_runtime_state(event_text="Warmup", storyboard_abort_note=None):
         nonlocal startup_time
         nonlocal warmup_complete_logged
         nonlocal current_event_text
+        nonlocal previous_session_status
         nonlocal prev_object_motion
 
         if storyboard_abort_note and storyboard.active:
@@ -203,6 +231,7 @@ def main():
         current_event_text = event_text
 
         object_tracker.reset()
+        change_analyzer.reset()
         deposit_event_manager.reset()
         frame_ring_buffer.clear()
         recent_event_paths.clear()
@@ -212,6 +241,7 @@ def main():
     def on_detection_paused_changed(paused):
         nonlocal detection_paused
         nonlocal current_event_text
+        nonlocal previous_session_status
         nonlocal prev_object_motion
 
         detection_paused = paused
@@ -340,13 +370,20 @@ def main():
             action.no_reward_config = current_config.get("no_reward_action", {})
 
             if region != prev_region:
-                cam.region = region
+                cam.capture_region = region.copy()
 
                 overlay.set_overlay_geometry(
                     left=region["left"],
                     top=region["top"],
                     width=region["width"],
                     height=region["height"]
+                )
+
+                status.set_status_geometry(
+                    left=region["left"],
+                    top=max(0, region["top"] - 52),
+                    width=max(560, region["width"]),
+                    height=42
                 )
 
                 reset_runtime_state(
@@ -387,11 +424,39 @@ def main():
                 logger.log_info("Task labels updated", task_labels=current_task_labels)
                 prev_task_labels = current_task_labels.copy()
 
+            current_video_config = current_config.get("video_input", {}).copy()
+
+            if current_video_config != prev_video_config:
+                try:
+                    cam.stop()
+                    cam = create_camera(region, current_video_config)
+                    reset_runtime_state(
+                        event_text="Video Input Changed",
+                        storyboard_abort_note="Storyboard aborted because video input changed."
+                    )
+                    logger.log_info("Video input updated", video_input=current_video_config)
+                    prev_video_config = current_video_config.copy()
+                except Exception as e:
+                    current_event_text = "Video Input Error"
+                    logger.log_error("Video input update failed", error=str(e), video_input=current_video_config)
+                    status.update_status(current_event_text, active_events=0, previous_status=previous_session_status)
+                    status.keep_on_top()
+                    time.sleep(1 / 60)
+                    continue
+
             frame = cam.get_frame()
+
+            if frame is None:
+                current_event_text = "No Frame"
+                status.update_status(current_event_text, active_events=0, previous_status=previous_session_status)
+                status.keep_on_top()
+                time.sleep(1 / 60)
+                continue
+
             frame_h, frame_w = frame.shape[:2]
 
-            region_w = region["width"]
-            region_h = region["height"]
+            region_w = frame_w
+            region_h = frame_h
 
             behavior_mode = current_config.get(
                 "behavior_mode",
@@ -490,17 +555,27 @@ def main():
                     combined_box
                 )
 
+            change_metrics = change_analyzer.analyze(
+                combined_frame=combined_crop,
+                object_frame=object_crop
+            )
+
             """ ### SEGMENT: ALWAYS-ON RING BUFFER ###
             Stores recent pre-event frames so new event sessions can include context
             from before object motion was detected. """
 
-            frame_ring_buffer.append({
+            pre_event_buffer_snapshot = list(frame_ring_buffer)
+
+            pre_event_record = {
                 "timestamp": time.time(),
                 "combined_frame": combined_crop.copy(),
                 "subject_frame": subject_crop.copy(),
                 "object_frame": object_crop.copy(),
                 "source": "pre"
-            })
+            }
+
+            pre_event_record.update(change_metrics)
+            frame_ring_buffer.append(pre_event_record)
 
             if manual_capture_requested:
                 os.makedirs("debug_captures", exist_ok=True)
@@ -531,7 +606,6 @@ def main():
 
                 if show_overlay:
                     overlay_frame = drawer.make_overlay_canvas(frame_w, frame_h)
-                    overlay_frame = drawer.draw_event_banner(overlay_frame, "Paused")
 
                     if show_capture_border:
                         overlay_frame = drawer.draw_capture_border(overlay_frame, label="Capture Region")
@@ -561,7 +635,9 @@ def main():
                 else:
                     overlay_frame = drawer.make_overlay_canvas(frame_w, frame_h)
 
+                status.update_status("Paused", active_events=0, previous_status=previous_session_status)
                 overlay.update_frame(overlay_frame)
+                status.keep_on_top()
                 time.sleep(1 / 60)
                 continue
 
@@ -583,7 +659,6 @@ def main():
 
                 if show_overlay:
                     overlay_frame = drawer.make_overlay_canvas(frame_w, frame_h)
-                    overlay_frame = drawer.draw_event_banner(overlay_frame, banner_text)
 
                     if show_capture_border:
                         overlay_frame = drawer.draw_capture_border(overlay_frame, label="Capture Region")
@@ -591,19 +666,24 @@ def main():
                     if show_grid:
                         overlay_frame = drawer.draw_grid(overlay_frame, step=100)
 
-                    labels_to_draw = ["subject context", "object ROI | warmup"] if show_labels else None
+                    if show_labels:
+                        labels_to_draw = ["trigger ROI | warmup"] if behavior_mode == "simple" else ["subject context", "object ROI | warmup"]
+                    else:
+                        labels_to_draw = None
 
                     overlay_frame = drawer.draw_boxes(
                         overlay_frame,
-                        boxes_to_draw = [box for box in [subject_box, object_box] if box is not None],
+                        [box for box in [subject_box, object_box] if box is not None],
                         labels=labels_to_draw,
-                        colors=[(0, 255, 0, 255), (255, 0, 0, 255)],
+                        colors=([(255, 0, 0, 255)] if behavior_mode == "simple" else [(0, 255, 0, 255), (255, 0, 0, 255)]),
                         show_coords=show_coords
                     )
                 else:
                     overlay_frame = drawer.make_overlay_canvas(frame_w, frame_h)
 
+                status.update_status(banner_text, active_events=0, previous_status=previous_session_status)
                 overlay.update_frame(overlay_frame)
+                status.keep_on_top()
                 time.sleep(1 / 60)
                 continue
 
@@ -625,7 +705,8 @@ def main():
                 detections=detections,
                 combined_frame=combined_crop,
                 object_frame=object_crop,
-                pre_buffer=list(frame_ring_buffer)
+                pre_buffer=pre_event_buffer_snapshot,
+                change_metrics=change_metrics
             )
 
             active_event_count = deposit_event_manager.get_active_count()
@@ -633,6 +714,8 @@ def main():
 
             if active_event_count > 0:
                 current_event_text = f"Object Events Active: {active_event_count}"
+            elif current_event_text.startswith("Object Events Active:"):
+                current_event_text = "Monitoring"
                 
             rejected_event = deposit_event_manager.get_next_rejected_event()
 
@@ -687,6 +770,8 @@ def main():
                     )
                 )
 
+                previous_session_status = "Rejected"
+
             ready_event = deposit_event_manager.get_next_ready_event()
 
             """ ### SEGMENT: DEPOSIT EVENT ANALYSIS ###
@@ -704,14 +789,8 @@ def main():
                     else:
                         centroid_path = ready_event.get_full_centroid_path()
 
-                        if is_duplicate_centroid_path(centroid_path, recent_event_paths):
-                            logger.log_info(
-                                "Duplicate centroid trajectory suppressed before API call",
-                                centroid_path_length=len(centroid_path)
-                            )
-                            continue
-
-                        recent_event_paths.append(centroid_path)
+                        if centroid_path:
+                            recent_event_paths.append(centroid_path)
 
                         contact_sheet = sheet_builder.build(selected_frames)
                         best_record = ready_event.get_best_record()
@@ -729,9 +808,9 @@ def main():
                             task_labels=task_labels
                         )
 
-                        storyboard.add_event(
+                        contact_sheet_event = storyboard.add_event(
                             "deposit_event_contact_sheet_ready",
-                            frame=best_event_frame.copy() if best_event_frame is not None else None,
+                            frame=contact_sheet.copy(),
                             notes="Best mid-trajectory event frame selected; contact sheet built from selected pre-event and event frames.",
                             data={"task_labels": task_labels}
                         )
@@ -811,13 +890,19 @@ def main():
                                 f"rewardable={rewardable}, "
                                 f"bestFrameIndex={best_frame_index}, "
                                 f"reason={reason}, "
-                                f"justification={justification}"
+                                f"justification={justification}, "
+                                f"openai_input_image={contact_sheet_event.get('image')}"
                             ),
-                            data=deposit_result
+                            data={
+                                **deposit_result,
+                                "openai_input_storyboard_event": "deposit_event_contact_sheet_ready",
+                                "openai_input_image": contact_sheet_event.get("image")
+                            }
                         )
 
                         if rewardable:
                             reward_label = object_label_result or task_labels.get("object_label", "Rewardable object")
+                            previous_session_status = "Rewarded"
                             current_event_text = "Treat Dispensed"
 
                             action.reward(label=reward_label)
@@ -832,6 +917,7 @@ def main():
 
                         else:
                             no_reward_label = object_label_result or "No reward"
+                            previous_session_status = "Not Rewarded"
                             current_event_text = "No Reward"
 
                             action.no_reward(label=no_reward_label)
@@ -857,11 +943,13 @@ def main():
             """ ### SEGMENT: OVERLAY RENDERING ###
             Draws subject/object ROI boxes and current system state. """
 
-            labels_to_draw = ["subject context", "object ROI"] if show_labels else None
+            if show_labels:
+                labels_to_draw = ["trigger ROI"] if behavior_mode == "simple" else ["subject context", "object ROI"]
+            else:
+                labels_to_draw = None
 
             if show_overlay:
                 overlay_frame = drawer.make_overlay_canvas(frame_w, frame_h)
-                overlay_frame = drawer.draw_event_banner(overlay_frame, current_event_text)
 
                 if show_capture_border:
                     overlay_frame = drawer.draw_capture_border(overlay_frame, label="Capture Region")
@@ -871,7 +959,7 @@ def main():
 
                 overlay_frame = drawer.draw_boxes(
                     overlay_frame,
-                    boxes_to_draw = [box for box in [subject_box, object_box] if box is not None],
+                    [box for box in [subject_box, object_box] if box is not None],
                     labels=labels_to_draw,
                     colors=[(0, 255, 0, 255), (255, 0, 0, 255)],
                     show_coords=show_coords
@@ -879,7 +967,9 @@ def main():
             else:
                 overlay_frame = drawer.make_overlay_canvas(frame_w, frame_h)
 
+            status.update_status(current_event_text, active_events=active_event_count, previous_status=previous_session_status)
             overlay.update_frame(overlay_frame)
+            status.keep_on_top()
             time.sleep(1 / 60)
 
     except KeyboardInterrupt:
@@ -892,6 +982,8 @@ def main():
         if storyboard.active:
             storyboard.abort(notes="Program shutdown before storyboard finalized.")
 
+        cam.stop()
+        status.close()
         overlay.close()
         panel.close()
 

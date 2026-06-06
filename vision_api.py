@@ -160,14 +160,24 @@ Return ONLY valid JSON:
         subject_label: str = "non-human animal",
         object_label: str = "man-made litter or trash",
         target_zone_label: str = "trash receptacle",
-        action_label: str = "depositing"
+        action_label: str = "depositing",
+        behavior_mode: str = "advanced",
+        reward_description: str = ""
     ) -> dict:
-        prompt = self.build_event_contact_sheet_prompt(
-            subject_label=subject_label,
-            object_label=object_label,
-            target_zone_label=target_zone_label,
-            action_label=action_label
-        )
+        if behavior_mode == "simple":
+
+            prompt = self.build_simple_behavior_prompt(
+                reward_description=reward_description
+            )
+
+        else:
+
+            prompt = self.build_event_contact_sheet_prompt(
+                subject_label=subject_label,
+                object_label=object_label,
+                target_zone_label=target_zone_label,
+                action_label=action_label
+            )
 
         image_b64 = self._encode_image(image_bytes)
         response = self._send_request(prompt, image_b64)
@@ -191,6 +201,21 @@ Return ONLY valid JSON:
         try:
             cleaned = self._clean_json_text(response)
             data = json.loads(cleaned)
+
+            if behavior_mode == "simple":
+
+                return {
+                    "subjectPresent": True,
+                    "subjectLabel": None,
+                    "objectPresent": True,
+                    "objectLabel": None,
+                    "actionObserved": True,
+                    "targetZoneVisible": True,
+                    "rewardable": bool(data.get("rewardable", False)),
+                    "bestFrameIndex": data.get("bestFrameIndex"),
+                    "reason": data.get("reason") or "",
+                    "justification": data.get("justification") or ""
+                }
 
             return {
                 "subjectPresent": bool(data.get("subjectPresent", False)),

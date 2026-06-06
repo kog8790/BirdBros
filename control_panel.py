@@ -208,8 +208,7 @@ class control_panel(QWidget):
         reward_layout.setSpacing(10)
 
         self.reward_mode = QComboBox()
-        self.reward_mode.addItems(["debug_popup", "mouse_click", "keyboard_shortcut", "webhook", "shell_command"])
-
+        self.reward_mode.addItems(["overlay_status", "mouse_click", "keyboard_shortcut", "webhook", "shell_command"])
         self.reward_x = self._make_spinbox(0, 10000)
         self.reward_y = self._make_spinbox(0, 10000)
         self.reward_clicks = self._make_spinbox(1, 20)
@@ -350,6 +349,9 @@ class control_panel(QWidget):
 
         self.reward_mode.currentTextChanged.connect(self._on_reward_action_changed)
         self.reward_method.currentIndexChanged.connect(self._on_widget_changed)
+
+        self.behavior_mode.currentTextChanged.connect(self._on_behavior_mode_changed)
+        self.reward_description.textChanged.connect(self._on_widget_changed)
         
         self.video_mode.currentTextChanged.connect(self._on_video_input_changed)
         self.video_loop.stateChanged.connect(self._on_widget_changed)
@@ -668,7 +670,12 @@ class control_panel(QWidget):
         self.action_label.setText(task.get("action_label", DEFAULT_CONFIG["task_labels"]["action_label"]))
 
         reward_cfg = cfg.get("reward_action", {})
-        self.reward_mode.setCurrentText(reward_cfg.get("mode", "debug_popup"))
+        reward_mode = reward_cfg.get("mode", "overlay_status")
+
+        if reward_mode == "debug_popup":
+            reward_mode = "overlay_status"
+        
+        self.reward_mode.setCurrentText(reward_mode)
         self.reward_x.setValue(reward_cfg.get("x", 735))
         self.reward_y.setValue(reward_cfg.get("y", 586))
         self.reward_clicks.setValue(reward_cfg.get("clicks", 3))
