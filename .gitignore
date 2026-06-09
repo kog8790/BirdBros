@@ -223,3 +223,11 @@ __marimo__/
 *.xcodeproj
 logs/
 debug_captures/
+
+# BirdBros packaging/runtime outputs
+release/
+*.dmg
+*.app
+.venv_build/
+manual_captures/
+storyboards/

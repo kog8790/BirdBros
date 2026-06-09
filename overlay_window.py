@@ -58,16 +58,21 @@ class overlay_window(QWidget):
         self.setWindowTitle("Bird Bros Overlay")
         self.setGeometry(QRect(self.left, self.top, self.width_value, self.height_value))
 
+        # The overlay is a visual guide, not a control surface.
+        # It should not fight the browser/video window for top-layer focus.
+        # The status window is the only UI element that should force always-on-top.
         self.setWindowFlags(
+            Qt.Window |
             Qt.FramelessWindowHint |
-            Qt.WindowStaysOnTopHint |
-            Qt.Tool |
-            Qt.WindowTransparentForInput
+            Qt.WindowTransparentForInput |
+            Qt.WindowDoesNotAcceptFocus
         )
 
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.setAttribute(Qt.WA_NoSystemBackground, True)
         self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+        self.setAttribute(Qt.WA_ShowWithoutActivating, True)
+        self.setFocusPolicy(Qt.NoFocus)
 
         self.show()
 

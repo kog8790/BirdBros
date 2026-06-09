@@ -31,7 +31,8 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QComboBox,
     QLineEdit,
-    QScrollArea
+    QScrollArea,
+    QSizePolicy
 )
 
 from config_manager import DEFAULT_CONFIG, load_config, save_config
@@ -42,6 +43,7 @@ class control_panel(QWidget):
     exit_requested = Signal()
     manual_capture_requested = Signal()
     detection_paused_changed = Signal(bool)
+    permanent_surface_clicked = Signal()
 
     def __init__(self, config_path="birdbros_config.json"):
         super().__init__()
@@ -51,10 +53,13 @@ class control_panel(QWidget):
         self.detection_paused = True
 
         self.setWindowTitle("Bird Bros Control Panel")
+        self.setObjectName("birdbros_control_panel")
+        self.setAttribute(Qt.WA_StyledBackground, True)
         self._apply_responsive_window_size()
         self.setWindowFlags(Qt.Window | Qt.WindowStaysOnTopHint)
 
         self._build_ui()
+        self._apply_visual_style()
         self._load_config_into_widgets()
         self._connect_signals()
         self.emit_config()
@@ -66,7 +71,8 @@ class control_panel(QWidget):
     def _build_ui(self):
         main_layout = QVBoxLayout()
         main_layout.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
-        main_layout.setSpacing(14)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(10)
 
         capture_group = QGroupBox("Capture Region")
         capture_form = QFormLayout()
@@ -271,7 +277,7 @@ class control_panel(QWidget):
         reward_group.setLayout(reward_layout)
 
         button_grid = QGridLayout()
-        button_grid.setSpacing(10)
+        button_grid.setSpacing(8)
 
         self.start_pause_button = QPushButton("Start Detection")
         self.save_button = QPushButton("Save Config")
@@ -280,16 +286,52 @@ class control_panel(QWidget):
         self.manual_capture_button = QPushButton("Manual ROI Capture")
         self.exit_button = QPushButton("Exit")
 
+        for button in [
+            self.start_pause_button, self.save_button, self.reload_button,
+            self.reset_button, self.manual_capture_button, self.exit_button
+        ]:
+            button.setMinimumWidth(0)
+            button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
+        self.start_pause_button.setObjectName("primaryButton")
+        self.exit_button.setObjectName("dangerButton")
+        self.save_button.setObjectName("secondaryButton")
+        self.reload_button.setObjectName("secondaryButton")
+        self.reset_button.setObjectName("secondaryButton")
+        self.manual_capture_button.setObjectName("secondaryButton")
+
         button_grid.addWidget(self.start_pause_button, 0, 0)
         button_grid.addWidget(self.save_button, 0, 1)
-        button_grid.addWidget(self.reload_button, 0, 2)
 
-        button_grid.addWidget(self.reset_button, 1, 0)
-        button_grid.addWidget(self.manual_capture_button, 1, 1)
-        button_grid.addWidget(self.exit_button, 1, 2)
+        button_grid.addWidget(self.reload_button, 1, 0)
+        button_grid.addWidget(self.reset_button, 1, 1)
+
+        button_grid.addWidget(self.manual_capture_button, 2, 0)
+        button_grid.addWidget(self.exit_button, 2, 1)
+
+        button_grid.setColumnStretch(0, 1)
+        button_grid.setColumnStretch(1, 1)
 
         self.status_label = QLabel("Ready")
+        self.status_label.setObjectName("footerStatus")
+        self.status_label.setAlignment(Qt.AlignCenter)
 
+        header_label = QLabel("BirdBros Recycle Co.")
+        header_label.setObjectName("appHeader")
+        header_label.setAlignment(Qt.AlignCenter)
+
+        subtitle_label = QLabel("Autonomous behavior reinforcement")
+        subtitle_label.setObjectName("appSubtitle")
+        subtitle_label.setAlignment(Qt.AlignCenter)
+
+        for group in [
+            capture_group, video_group, self.subject_group, self.object_group,
+            motion_group, display_group, task_group, reward_group
+        ]:
+            group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Maximum)
+
+        main_layout.addWidget(header_label)
+        main_layout.addWidget(subtitle_label)
         main_layout.addWidget(capture_group)
         main_layout.addWidget(video_group)
         main_layout.addWidget(self.subject_group)
@@ -302,21 +344,205 @@ class control_panel(QWidget):
         main_layout.addWidget(self.status_label)
 
         content_widget = QWidget()
+        content_widget.setMinimumWidth(0)
+        content_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Maximum)
         content_widget.setLayout(main_layout)
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         scroll.setWidget(content_widget)
 
         outer_layout = QVBoxLayout()
         outer_layout.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
-        outer_layout.setContentsMargins(18, 18, 18, 18)
-        outer_layout.setSpacing(14)
+        outer_layout.setContentsMargins(12, 12, 12, 12)
+        outer_layout.setSpacing(10)
         outer_layout.addWidget(scroll)
 
         self.setLayout(outer_layout)
+
+
+    def _apply_visual_style(self):
+        self.setStyleSheet(
+            """
+            QWidget#birdbros_control_panel {
+                background-color: #151719;
+                color: #ECE8DD;
+                font-family: "SF Pro Display", "Helvetica Neue", Arial;
+                font-size: 13px;
+            }
+
+            QLabel#appHeader {
+                color: #F8F3E7;
+                font-size: 24px;
+                font-weight: 700;
+                letter-spacing: 0.5px;
+                padding-top: 4px;
+            }
+
+            QLabel#appSubtitle {
+                color: rgba(236, 232, 221, 150);
+                font-size: 12px;
+                font-weight: 500;
+                padding-bottom: 4px;
+            }
+
+            QScrollArea {
+                border: none;
+                background: transparent;
+            }
+
+            QScrollArea > QWidget > QWidget {
+                background: transparent;
+            }
+
+            QGroupBox {
+                background-color: rgba(255, 255, 255, 15);
+                border: 1px solid rgba(255, 255, 255, 30);
+                border-radius: 16px;
+                margin-top: 18px;
+                padding: 14px 10px 10px 10px;
+                color: #F5EEDC;
+                font-size: 13px;
+                font-weight: 650;
+            }
+
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                subcontrol-position: top left;
+                left: 12px;
+                top: 2px;
+                padding: 0 8px;
+                color: #F1D99B;
+                background-color: #151719;
+                border-radius: 8px;
+            }
+
+            QLabel {
+                color: #ECE8DD;
+            }
+
+            QLabel#fieldLabel {
+                color: rgba(236, 232, 221, 165);
+                font-size: 12px;
+                font-weight: 550;
+            }
+
+            QLabel#footerStatus {
+                color: rgba(245, 238, 220, 180);
+                background-color: rgba(255, 255, 255, 12);
+                border: 1px solid rgba(255, 255, 255, 22);
+                border-radius: 12px;
+                padding: 10px;
+                font-weight: 600;
+            }
+
+            QLineEdit, QSpinBox, QComboBox {
+                color: #F8F3E7;
+                background-color: rgba(255, 255, 255, 24);
+                border: 1px solid rgba(255, 255, 255, 34);
+                border-radius: 10px;
+                padding: 6px 8px;
+                selection-background-color: #74D7C4;
+                selection-color: #101214;
+            }
+
+            QLineEdit:focus, QSpinBox:focus, QComboBox:focus {
+                border: 1px solid #74D7C4;
+                background-color: rgba(255, 255, 255, 32);
+            }
+
+            QComboBox::drop-down {
+                border: none;
+                width: 26px;
+            }
+
+            QCheckBox {
+                color: rgba(245, 238, 220, 210);
+                spacing: 8px;
+                font-weight: 500;
+            }
+
+            QCheckBox::indicator {
+                width: 17px;
+                height: 17px;
+                border-radius: 5px;
+                border: 1px solid rgba(255, 255, 255, 55);
+                background-color: rgba(255, 255, 255, 18);
+            }
+
+            QCheckBox::indicator:checked {
+                background-color: #74D7C4;
+                border: 1px solid #74D7C4;
+            }
+
+            QPushButton {
+                color: #F8F3E7;
+                background-color: rgba(255, 255, 255, 22);
+                border: 1px solid rgba(255, 255, 255, 34);
+                border-radius: 13px;
+                padding: 8px 9px;
+                font-weight: 650;
+            }
+
+            QPushButton:hover {
+                background-color: rgba(255, 255, 255, 34);
+                border: 1px solid rgba(255, 255, 255, 55);
+            }
+
+            QPushButton:pressed {
+                background-color: rgba(255, 255, 255, 16);
+            }
+
+            QPushButton#primaryButton {
+                color: #08110F;
+                background-color: #74D7C4;
+                border: 1px solid #9FE8DB;
+            }
+
+            QPushButton#primaryButton:hover {
+                background-color: #91E4D5;
+            }
+
+            QPushButton#dangerButton {
+                color: #FFEDEA;
+                background-color: rgba(255, 111, 94, 95);
+                border: 1px solid rgba(255, 145, 128, 130);
+            }
+
+            QScrollBar:vertical, QScrollBar:horizontal {
+                background: transparent;
+                border: none;
+                margin: 0px;
+            }
+
+            QScrollBar:vertical {
+                width: 10px;
+            }
+
+            QScrollBar:horizontal {
+                height: 10px;
+            }
+
+            QScrollBar::handle:vertical, QScrollBar::handle:horizontal {
+                background: rgba(255, 255, 255, 45);
+                border-radius: 5px;
+                min-height: 36px;
+                min-width: 36px;
+            }
+
+            QScrollBar::handle:vertical:hover, QScrollBar::handle:horizontal:hover {
+                background: rgba(255, 255, 255, 75);
+            }
+
+            QScrollBar::add-line, QScrollBar::sub-line,
+            QScrollBar::add-page, QScrollBar::sub-page {
+                background: transparent;
+                border: none;
+            }
+            """
+        )
 
     # ================================
     # SIGNAL WIRING
@@ -393,28 +619,37 @@ class control_panel(QWidget):
 
         geometry = screen.availableGeometry()
 
-        panel_width = int(geometry.width() * 0.20)
+        panel_width = min(620, max(500, int(geometry.width() * 0.34)))
         panel_height = geometry.height()
 
         self.resize(panel_width, panel_height)
-        self.setMinimumWidth(int(geometry.width() * 0.14))
+        self.setMinimumWidth(420)
 
     def _make_spinbox(self, min_value, max_value):
         spin = QSpinBox()
         spin.setRange(min_value, max_value)
         spin.setSingleStep(1)
+        spin.setButtonSymbols(QSpinBox.PlusMinus)
+        spin.setMinimumWidth(72)
+        spin.setMaximumWidth(118)
+        spin.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         return spin
 
     def _make_reward_row(self, label_text, widget):
         row = QWidget()
         row_layout = QHBoxLayout(row)
         row_layout.setContentsMargins(0, 0, 0, 0)
-        row_layout.setSpacing(10)
+        row_layout.setSpacing(8)
 
         label = QLabel(label_text)
+        label.setObjectName("fieldLabel")
         label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
 
-        row_layout.addWidget(label, 1)
+        widget.setMinimumWidth(0)
+        widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
+        label.setMinimumWidth(92)
+        row_layout.addWidget(label, 0)
         row_layout.addWidget(widget, 1)
 
         return row
@@ -718,6 +953,10 @@ class control_panel(QWidget):
         self._load_config_into_widgets()
         self.emit_config()
         self.status_label.setText("Reset to defaults")
+        
+    def mousePressEvent(self, event):
+        self.permanent_surface_clicked.emit()
+        super().mousePressEvent(event)
 
 
 """ ### SEGMENT: SYSTEM CONTEXT ###

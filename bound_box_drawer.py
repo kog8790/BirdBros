@@ -1,26 +1,16 @@
-"""                 ### SEGMENT: FILE OVERVIEW ###
+""" ### SEGMENT: FILE OVERVIEW ###
 PURPOSE:
-Handles all visual rendering of overlays including ROI boxes, labels, grids, and event banners.
+Handles all visual rendering of overlays including ROI boxes, labels, grids, and capture border.
 
 RESPONSIBILITIES:
-- Draw ROI rectangles (subject/object)
+- Draw ROI rectangles
 - Render optional labels and coordinates
 - Display grid and capture border
-- Render current system state (event banner)
-
-USED BY:
-- main.py (overlay rendering loop)
-
-INPUTS:
-- Frame dimensions
-- ROI box objects (bound_box_define)
-- Labels, colors, display flags
-
-OUTPUTS:
-- RGBA overlay frame for display
+- Keep overlay visuals separate from detection logic
 
 DESIGN INTENT:
-Keep all visualization logic isolated from detection and processing logic."""
+Make the live overlay feel like a polished instrument layer instead of a debug utility.
+"""
 
 import cv2
 import numpy as np
@@ -31,13 +21,13 @@ from bound_box_define import bound_box_define
 class bound_box_drawer:
     def __init__(
         self,
-        default_color: Tuple[int, int, int, int] = (0, 255, 0, 255),
-        capture_color: Tuple[int, int, int, int] = (0, 255, 255, 255),
-        text_color: Tuple[int, int, int, int] = (255, 255, 255, 255),
-        banner_bg_color: Tuple[int, int, int, int] = (40, 40, 40, 180),
-        grid_color: Tuple[int, int, int, int] = (90, 90, 90, 120),
+        default_color: Tuple[int, int, int, int] = (105, 236, 198, 235),
+        capture_color: Tuple[int, int, int, int] = (0, 214, 235, 220),
+        text_color: Tuple[int, int, int, int] = (248, 243, 231, 245),
+        banner_bg_color: Tuple[int, int, int, int] = (20, 22, 24, 185),
+        grid_color: Tuple[int, int, int, int] = (248, 243, 231, 42),
         thickness: int = 2,
-        font_scale: float = 0.5,
+        font_scale: float = 0.52,
         font_thickness: int = 1,
         banner_height: int = 50
     ):
@@ -52,18 +42,23 @@ class bound_box_drawer:
         self.banner_height = banner_height
         self.font = cv2.FONT_HERSHEY_SIMPLEX
 
-    """         ### SEGMENT: OVERLAY CANVAS ###
-    make_overlay_canvas():
-    Creates a blank transparent RGBA canvas matching frame size."""
-    
-    def make_overlay_canvas(self, frame_width: int, frame_height: int):
-        canvas = np.zeros((frame_height, frame_width, 4), dtype=np.uint8)
-        return canvas
+        self.label_bg_color = (12, 14, 16, 165)
+        self.coordinate_bg_color = (12, 14, 16, 120)
+        self.corner_length = 18
 
-    """             ### SEGMENT: EVENT DISPLAY ###
-    draw_event_banner():
-    Displays current system state (e.g., Warmup, Motion Detected, Reward)."""
-        
+    # ================================
+    # OVERLAY CANVAS
+    # ================================
+
+    def make_overlay_canvas(self, frame_width: int, frame_height: int):
+        return np.zeros((frame_height, frame_width, 4), dtype=np.uint8)
+
+    # ================================
+    # EVENT DISPLAY
+    # Kept for backward compatibility; main.py no longer needs this because
+    # status_window.py owns runtime status.
+    # ================================
+
     def draw_event_banner(
         self,
         canvas,
@@ -75,97 +70,78 @@ class bound_box_drawer:
 
         h, w = canvas.shape[:2]
 
-        overlay = canvas.copy()
-        cv2.rectangle(
-            overlay,
-            (0, 0),
-            (w, self.banner_height),
+        self._draw_rounded_rect(
+            canvas,
+            8,
+            8,
+            w - 8,
+            min(h - 8, self.banner_height),
             self.banner_bg_color,
-            -1
+            radius=14,
+            fill=True
         )
 
-        canvas = self._alpha_blend(overlay, canvas)
-
-        cv2.putText(
+        self._draw_label_with_backing(
             canvas,
             message,
-            (12, int(self.banner_height * 0.65)),
-            self.font,
-            0.7,
+            18,
+            31,
             self.text_color,
-            2,
-            cv2.LINE_AA
+            bg_color=(0, 0, 0, 0),
+            scale=0.64,
+            thickness=2
         )
 
         if previous_session_status:
-
-            status_text = (f"Prev Session: {previous_session_status}")
-
-            text_size = cv2.getTextSize(
-                status_text,
-                self.font,
-                0.7,
-                2
-            )[0]
-
-            cv2.putText(
+            status_text = f"Prev Session: {previous_session_status}"
+            text_size = cv2.getTextSize(status_text, self.font, 0.64, 2)[0]
+            self._draw_label_with_backing(
                 canvas,
                 status_text,
-                (
-                    w - text_size[0] - 12,
-                    int(self.banner_height * 0.65)
-                ),
-                self.font,
-                0.7,
+                w - text_size[0] - 24,
+                31,
                 self.text_color,
-                2,
-                cv2.LINE_AA
+                bg_color=(0, 0, 0, 0),
+                scale=0.64,
+                thickness=2
             )
 
         return canvas
-        
-    """             ### SEGMENT: GRID + BORDER ###
-        draw_grid():
-        Draws background reference grid.
 
-        draw_capture_border():
-        Draws outer boundary of capture region."""
+    # ================================
+    # GRID + BORDER
+    # ================================
 
     def draw_capture_border(self, canvas, label: str = "Capture Region"):
         h, w = canvas.shape[:2]
 
-        top = 0 #self.banner_height
         left = 0
+        top = 0
         right = w - 1
         bottom = h - 1
 
-        cv2.rectangle(
-            canvas,
-            (left, top),
-            (right, bottom),
-            self.capture_color,
-            self.thickness
-        )
+        self._draw_outline(canvas, left, top, right, bottom, self.capture_color, self.thickness)
+        self._draw_corner_accents(canvas, left, top, right, bottom, self.capture_color)
 
-        cv2.putText(
+        self._draw_label_with_backing(
             canvas,
             label,
-            (10, top + 20),
-            self.font,
-            self.font_scale,
+            12,
+            24,
             self.capture_color,
-            self.font_thickness,
-            cv2.LINE_AA
+            bg_color=self.label_bg_color,
+            scale=self.font_scale,
+            thickness=self.font_thickness
         )
 
         self._draw_point_label(canvas, left, top, "(0,0)", self.capture_color)
-        self._draw_point_label(canvas, max(0, right - 110), top, f"({right},0)", self.capture_color)
-        self._draw_point_label(canvas, left, max(top + 14, bottom - 8), f"(0,{bottom - top})", self.capture_color)
+        self._draw_point_label(canvas, max(0, right - 82), top, f"({right},0)", self.capture_color)
+        self._draw_point_label(canvas, left, max(16, bottom - 8), f"(0,{bottom})", self.capture_color)
         self._draw_point_label(
             canvas,
-            max(0, right - 150),
-            max(top + 14, bottom - 8),
-            f"({right},{bottom - top})",
+            max(0, right - 104),
+            max(16, bottom - 8),
+            f"({right},{bottom})",
             self.capture_color
         )
 
@@ -173,51 +149,18 @@ class bound_box_drawer:
 
     def draw_grid(self, canvas, step: int = 100):
         h, w = canvas.shape[:2]
-        frame_top = 0 #self.banner_height
 
         for x in range(0, w, step):
-            cv2.line(
-                canvas,
-                (x, frame_top),
-                (x, h),
-                self.grid_color,
-                1,
-                cv2.LINE_AA
-            )
-            cv2.putText(
-                canvas,
-                str(x),
-                (x + 4, frame_top + 16),
-                self.font,
-                0.4,
-                self.grid_color,
-                1,
-                cv2.LINE_AA
-            )
+            cv2.line(canvas, (x, 0), (x, h), self.grid_color, 1, cv2.LINE_AA)
 
-        relative_y = 0
-        for y in range(frame_top, h, step):
-            cv2.line(
-                canvas,
-                (0, y),
-                (w, y),
-                self.grid_color,
-                1,
-                cv2.LINE_AA
-            )
-            cv2.putText(
-                canvas,
-                str(relative_y),
-                (4, y + 16),
-                self.font,
-                0.4,
-                self.grid_color,
-                1,
-                cv2.LINE_AA
-            )
-            relative_y += step
+        for y in range(0, h, step):
+            cv2.line(canvas, (0, y), (w, y), self.grid_color, 1, cv2.LINE_AA)
 
         return canvas
+
+    # ================================
+    # ROI DRAWING
+    # ================================
 
     def draw_box(
         self,
@@ -229,29 +172,28 @@ class bound_box_drawer:
     ):
         clr = color if color is not None else self.default_color
 
-        x = box.x
-        y = box.y #+ self.banner_height
-        w = box.w
-        h = box.h
+        x = int(box.x)
+        y = int(box.y)
+        w = int(box.w)
+        h = int(box.h)
 
-        cv2.rectangle(
-            canvas,
-            (x, y),
-            (x + w, y + h),
-            clr,
-            self.thickness
-        )
+        right = x + w
+        bottom = y + h
+
+        self._draw_outline(canvas, x, y, right, bottom, clr, self.thickness)
+        self._draw_corner_accents(canvas, x, y, right, bottom, clr)
 
         if label:
-            cv2.putText(
+            label_y = max(24, y - 8)
+            self._draw_label_with_backing(
                 canvas,
                 label,
-                (x, max(self.banner_height + 18, y - 8)),
-                self.font,
-                self.font_scale,
+                x,
+                label_y,
                 clr,
-                self.font_thickness,
-                cv2.LINE_AA
+                bg_color=self.label_bg_color,
+                scale=self.font_scale,
+                thickness=self.font_thickness
             )
 
         if show_coords:
@@ -261,18 +203,14 @@ class bound_box_drawer:
             self._draw_point_label(canvas, x, y, top_left_text, clr)
             self._draw_point_label(
                 canvas,
-                max(0, x + w - 95),
-                max(self.banner_height + 14, y + h - 8),
+                max(0, right - 84),
+                max(16, bottom - 8),
                 bottom_right_text,
                 clr
             )
 
         return canvas
 
-    """             ### SEGMENT: ROI DRAWING ###
-    draw_boxes():
-    Draws ROI rectangles with optional labels and coordinate text."""
-    
     def draw_boxes(
         self,
         canvas,
@@ -288,17 +226,109 @@ class bound_box_drawer:
 
         return canvas
 
-    def _draw_point_label(self, canvas, x: int, y: int, text: str, color):
+    # ================================
+    # DRAWING HELPERS
+    # ================================
+
+    def _draw_outline(self, canvas, left, top, right, bottom, color, thickness):
+        cv2.rectangle(
+            canvas,
+            (int(left), int(top)),
+            (int(right), int(bottom)),
+            color,
+            max(1, thickness),
+            cv2.LINE_AA
+        )
+
+    def _draw_corner_accents(self, canvas, left, top, right, bottom, color):
+        length = min(self.corner_length, max(8, int((right - left) * 0.18)), max(8, int((bottom - top) * 0.18)))
+        accent_thickness = max(2, self.thickness + 1)
+
+        points = [
+            ((left, top), (left + length, top)),
+            ((left, top), (left, top + length)),
+            ((right, top), (right - length, top)),
+            ((right, top), (right, top + length)),
+            ((left, bottom), (left + length, bottom)),
+            ((left, bottom), (left, bottom - length)),
+            ((right, bottom), (right - length, bottom)),
+            ((right, bottom), (right, bottom - length)),
+        ]
+
+        for start, end in points:
+            cv2.line(canvas, start, end, color, accent_thickness, cv2.LINE_AA)
+
+    def _draw_label_with_backing(
+        self,
+        canvas,
+        text: str,
+        x: int,
+        y: int,
+        color,
+        bg_color=None,
+        scale=None,
+        thickness=None
+    ):
+        if not text:
+            return
+
+        scale = self.font_scale if scale is None else scale
+        thickness = self.font_thickness if thickness is None else thickness
+        bg_color = self.label_bg_color if bg_color is None else bg_color
+
+        text_size, baseline = cv2.getTextSize(text, self.font, scale, thickness)
+        text_w, text_h = text_size
+
+        pad_x = 7
+        pad_y = 5
+
+        x1 = max(0, int(x) - pad_x)
+        y1 = max(0, int(y) - text_h - pad_y)
+        x2 = min(canvas.shape[1] - 1, int(x) + text_w + pad_x)
+        y2 = min(canvas.shape[0] - 1, int(y) + baseline + pad_y)
+
+        if bg_color[3] > 0:
+            self._draw_rounded_rect(canvas, x1, y1, x2, y2, bg_color, radius=7, fill=True)
+
         cv2.putText(
             canvas,
             text,
-            (max(0, x + 4), max(12, y - 4)),
+            (int(x), int(y)),
             self.font,
-            0.4,
+            scale,
             color,
-            1,
+            thickness,
             cv2.LINE_AA
         )
+
+    def _draw_point_label(self, canvas, x: int, y: int, text: str, color):
+        self._draw_label_with_backing(
+            canvas,
+            text,
+            max(4, int(x) + 4),
+            max(15, int(y) + 15),
+            color,
+            bg_color=self.coordinate_bg_color,
+            scale=0.40,
+            thickness=1
+        )
+
+    def _draw_rounded_rect(self, canvas, x1, y1, x2, y2, color, radius=8, fill=True):
+        x1, y1, x2, y2 = map(int, [x1, y1, x2, y2])
+        radius = max(0, min(radius, abs(x2 - x1) // 2, abs(y2 - y1) // 2))
+        thickness = -1 if fill else self.thickness
+
+        if radius <= 0:
+            cv2.rectangle(canvas, (x1, y1), (x2, y2), color, thickness, cv2.LINE_AA)
+            return
+
+        cv2.rectangle(canvas, (x1 + radius, y1), (x2 - radius, y2), color, thickness, cv2.LINE_AA)
+        cv2.rectangle(canvas, (x1, y1 + radius), (x2, y2 - radius), color, thickness, cv2.LINE_AA)
+
+        cv2.circle(canvas, (x1 + radius, y1 + radius), radius, color, thickness, cv2.LINE_AA)
+        cv2.circle(canvas, (x2 - radius, y1 + radius), radius, color, thickness, cv2.LINE_AA)
+        cv2.circle(canvas, (x1 + radius, y2 - radius), radius, color, thickness, cv2.LINE_AA)
+        cv2.circle(canvas, (x2 - radius, y2 - radius), radius, color, thickness, cv2.LINE_AA)
 
     def _alpha_blend(self, fg, bg):
         alpha = fg[:, :, 3:4] / 255.0
@@ -306,23 +336,18 @@ class bound_box_drawer:
         out[:, :, :3] = (fg[:, :, :3] * alpha + bg[:, :, :3] * (1 - alpha)).astype(np.uint8)
         out[:, :, 3] = np.maximum(bg[:, :, 3], fg[:, :, 3])
         return out
-        
-        
-        
-"""                 ### SEGMENT: SYSTEM CONTEXT ###
+
+
+""" ### SEGMENT: SYSTEM CONTEXT ###
 FLOW:
-
 main.py
-    ↓ (creates overlay frame)
+    ↓ creates overlay frame
 bound_box_drawer.py
-    ↓ (renders visual elements)
+    ↓ renders visual elements
 overlay_window.py
-    ↓ (displays on screen)
-
-INPUT SOURCES:
-- ROI boxes from main.py
-- display flags from config_manager/control_panel
+    ↓ displays on screen
 
 DESIGN INTENT:
-Ensure visual debugging and user feedback remain decoupled
-from core detection and decision logic."""
+The overlay should support confidence and tuning without making the app feel like a lab bench.
+"""
+

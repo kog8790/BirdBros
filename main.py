@@ -21,6 +21,7 @@ from collections import deque
 
 import cv2
 from dotenv import load_dotenv
+from PySide6.QtCore import Qt
 
 from cam_controller import cam_controller
 from bound_box_define import bound_box_define
@@ -36,6 +37,8 @@ from status_window import status_window
 from control_panel import control_panel
 from logger import Logger
 from session_storyboard import session_storyboard
+from api_key_store import get_openai_api_key
+from first_run_setup import run_first_run_setup
 
 
 def encode_frame_to_jpeg_bytes(frame):
@@ -84,23 +87,22 @@ def main():
     logging, vision, reward action, and storyboard tracking. """
 
     load_dotenv()
-    api_key = os.getenv("OPENAI_API_KEY")
+
+    app = get_or_create_qt_app()
+
+    api_key = get_openai_api_key()
 
     if not api_key:
-        api_key = input("Enter your OpenAI API Key: ").strip()
+        api_key = run_first_run_setup()
 
         if not api_key:
-            raise ValueError("OPENAI_API_KEY is required")
-
-        with open(".env", "w") as env_file:
-            env_file.write(f"OPENAI_API_KEY={api_key}\n")
+            return
 
     vision = vision_api(api_key=api_key)
     logger = Logger()
-    
+
     logger.purge_old_files(log_retention_days=90, storyboard_retention_days=14)
 
-    app = get_or_create_qt_app()
     running = True
 
     panel = control_panel()
@@ -145,7 +147,7 @@ def main():
     status = status_window(
         left=region["left"],
         top=max(0, region["top"] - 52),
-        width=max(560, region["width"]),
+        width=region["width"],
         height=42
     )
 
@@ -199,22 +201,58 @@ def main():
 
     screen = app.primaryScreen().availableGeometry()
 
-    panel_width = int(screen.width() * 0.30)
-    panel_height = screen.height()
+    def clamp_value(value, minimum, maximum):
+        return max(minimum, min(maximum, value))
+
+    def calculate_panel_geometry():
+        active_screen = app.primaryScreen().availableGeometry()
+        responsive_width = int(active_screen.width() * 0.34)
+        panel_width = clamp_value(responsive_width, 500, 620)
+        panel_height = active_screen.height()
+        panel_x = active_screen.x() + active_screen.width() - panel_width
+        panel_y = active_screen.y()
+        return active_screen, panel_x, panel_y, panel_width, panel_height
+
+    def calculate_status_height(active_screen):
+        return int(clamp_value(int(active_screen.height() * 0.045), 40, 52))
+
+    def calculate_status_top(active_screen, active_region, status_height):
+        preferred_top = active_region["top"] - status_height - 10
+        minimum_top = active_screen.top() + 10
+        return max(minimum_top, preferred_top)
+
+    screen, panel_x, panel_y, panel_width, panel_height = calculate_panel_geometry()
 
     panel.resize(panel_width, panel_height)
+    panel.move(panel_x, panel_y)
 
-    desired_x = region["left"] + region["width"] + 20
-    max_x = screen.width() - panel_width
-    panel_x = screen.x() + screen.width() - panel_width
-
-    panel.move(panel_x, screen.top())
+    status_height = calculate_status_height(screen)
+    status.set_status_geometry(
+        left=region["left"],
+        top=calculate_status_top(screen, region, status_height),
+        width=region["width"],
+        height=status_height
+    )
 
     panel.show()
     panel.raise_()
     panel.activateWindow()
 
     status.keep_on_top()
+
+    def bring_app_surfaces_to_front():
+        overlay.show()
+        overlay.raise_()
+        status.keep_on_top()
+        panel.raise_()
+
+    def lower_overlay_when_birdbros_inactive(state):
+        if state != Qt.ApplicationActive:
+            overlay.lower()
+            status.keep_on_top()
+
+    status.permanent_surface_clicked.connect(bring_app_surfaces_to_front)
+    panel.permanent_surface_clicked.connect(bring_app_surfaces_to_front)
     
     def reset_runtime_state(event_text="Warmup", storyboard_abort_note=None):
         nonlocal startup_time
@@ -379,11 +417,14 @@ def main():
                     height=region["height"]
                 )
 
+                screen, panel_x, panel_y, panel_width, panel_height = calculate_panel_geometry()
+                status_height = calculate_status_height(screen)
+
                 status.set_status_geometry(
                     left=region["left"],
-                    top=max(0, region["top"] - 52),
-                    width=max(560, region["width"]),
-                    height=42
+                    top=calculate_status_top(screen, region, status_height),
+                    width=region["width"],
+                    height=status_height
                 )
 
                 reset_runtime_state(
