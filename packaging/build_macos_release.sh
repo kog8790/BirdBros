@@ -84,6 +84,26 @@ if [[ ! -d "$APP_PATH" ]]; then
   exit 1
 fi
 
+# Remove bundled PySide6 developer/helper apps that are not needed at runtime
+# and can break Developer ID signing.
+# Remove bundled PySide6 developer/helper apps that are not needed at runtime
+# and can break Developer ID signing.
+# Remove bundled PySide6 developer/helper apps that are not needed at runtime
+# and can break Developer ID signing.
+# Remove bundled PySide6 developer/helper apps that are not needed at runtime
+# and can break Developer ID signing.
+find "$APP_PATH" \
+  \( \
+    -name "Assistant__dot__app" -o \
+    -name "Assistant.app" -o \
+    -name "Designer__dot__app" -o \
+    -name "Designer.app" -o \
+    -name "Linguist__dot__app" -o \
+    -name "Linguist.app" \
+  \) \
+  -prune \
+  -exec rm -rf {} +
+
 # Keep user-specific runtime files outside the app bundle.
 mkdir -p "$HOME/Library/Application Support/${APP_NAME}"
 mkdir -p "$HOME/Library/Logs/${APP_NAME}"
@@ -119,6 +139,9 @@ mkdir -p "$DMG_STAGE"
 # appear as a loose file in the mounted DMG.
 ditto "$APP_PATH" "$DMG_STAGE/${APP_NAME}.app"
 
+mkdir -p "$DMG_STAGE/.background"
+cp "$DMG_BACKGROUND" "$DMG_STAGE/.background/dmg_background.png"
+
 APP_SIZE_MB="$(du -sm "$APP_PATH" | awk '{print $1}')"
 DMG_SIZE_MB=$(( APP_SIZE_MB + 350 ))
 if [[ "$DMG_SIZE_MB" -lt 700 ]]; then
@@ -145,7 +168,7 @@ symlinks = {
 }
 
 badge_icon = None
-background = r'''${DMG_BACKGROUND_ABS}'''
+background = '.background/dmg_background.png'
 show_status_bar = False
 show_tab_view = False
 show_toolbar = False
