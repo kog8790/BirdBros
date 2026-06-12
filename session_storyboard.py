@@ -18,15 +18,26 @@ import os
 import json
 import cv2
 from datetime import datetime
+from pathlib import Path
 
 
 class session_storyboard:
-    def __init__(self, logger=None, root_dir="logs/storyboards"):
+    def __init__(self, logger=None, root_dir=None):
         self.logger = logger
-        self.root_dir = root_dir
+
+        if root_dir is None:
+            root_dir = (
+                Path.home()
+                / "Library"
+                / "Logs"
+                / "BirdBros Recycle Co"
+                / "storyboards"
+            )
+
+        self.root_dir = str(root_dir)
         os.makedirs(self.root_dir, exist_ok=True)
         self.reset()
-
+        
     # ================================
     # SESSION LIFECYCLE
     # ================================

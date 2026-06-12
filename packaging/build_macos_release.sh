@@ -4,43 +4,66 @@ set -euo pipefail
 APP_NAME="BirdBros Recycle Co"
 BUNDLE_ID="${BUNDLE_ID:-co.birdbros.recycleco}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
-SIGN_IDENTITY="${SIGN_IDENTITY:-}"
+
+SIGN_IDENTITY="${SIGN_IDENTITY:-Developer ID Application: Kevin Green (J583YGMDCF)}"
 APPLE_ID="${APPLE_ID:-}"
-APPLE_TEAM_ID="${APPLE_TEAM_ID:-}"
+APPLE_TEAM_ID="${APPLE_TEAM_ID:-J583YGMDCF}"
 APPLE_APP_PASSWORD="${APPLE_APP_PASSWORD:-}"
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 
-if [[ "$(uname -s)" != "Darwin" ]]; then
-  echo "This release builder must be run on macOS."
+die() {
+  echo ""
+  echo "❌ RELEASE BUILD FAILED:"
+  echo "$1"
+  echo ""
   exit 1
+}
+
+require_release_secret() {
+  local name="$1"
+  local value="$2"
+
+  if [[ -z "$value" ]]; then
+    die "$name is missing. This script only creates signed/notarized/stapled release builds."
+  fi
+}
+
+if [[ "$(uname -s)" != "Darwin" ]]; then
+  die "This release builder must be run on macOS."
+fi
+
+require_release_secret "SIGN_IDENTITY" "$SIGN_IDENTITY"
+require_release_secret "APPLE_ID" "$APPLE_ID"
+require_release_secret "APPLE_TEAM_ID" "$APPLE_TEAM_ID"
+require_release_secret "APPLE_APP_PASSWORD" "$APPLE_APP_PASSWORD"
+
+if ! security find-identity -v -p codesigning | grep -F "$SIGN_IDENTITY" >/dev/null; then
+  die "Signing identity not found in Keychain: $SIGN_IDENTITY"
 fi
 
 if [[ ! -f "main.py" ]]; then
-  echo "main.py not found. Run this from the packaging folder inside your BirdBros project folder."
-  exit 1
+  die "main.py not found. Run this from inside your BirdBros project folder."
 fi
 
 FIRST_RUN_README="packaging/FIRST_RUN_README.txt"
 DMG_BACKGROUND="packaging/dmg_background.png"
-DMG_BACKGROUND_ABS="$ROOT_DIR/$DMG_BACKGROUND"
 ICON_PATH="assets/BirdBros.icns"
 
-if [[ ! -f "$FIRST_RUN_README" ]]; then
-  echo "Missing $FIRST_RUN_README"
-  exit 1
-fi
-
-if [[ ! -f "$DMG_BACKGROUND" ]]; then
-  echo "Missing $DMG_BACKGROUND"
-  exit 1
-fi
+[[ -f "$FIRST_RUN_README" ]] || die "Missing $FIRST_RUN_README"
+[[ -f "$DMG_BACKGROUND" ]] || die "Missing $DMG_BACKGROUND"
 
 echo "==> Building ${APP_NAME} for macOS"
 
 rm -rf build dist release
 mkdir -p release
+
+# Prevent dmgbuild from writing into an old mounted read-only volume.
+if hdiutil info | grep -F "/Volumes/${APP_NAME}" >/dev/null; then
+  echo "==> Detaching stale mounted DMG volume"
+  hdiutil detach "/Volumes/${APP_NAME}" -force || true
+fi
 
 "$PYTHON_BIN" -m venv .venv_build
 source .venv_build/bin/activate
@@ -79,19 +102,8 @@ else
 fi
 
 APP_PATH="dist/${APP_NAME}.app"
-if [[ ! -d "$APP_PATH" ]]; then
-  echo "Expected app bundle not found at: $APP_PATH"
-  exit 1
-fi
+[[ -d "$APP_PATH" ]] || die "Expected app bundle not found at: $APP_PATH"
 
-# Remove bundled PySide6 developer/helper apps that are not needed at runtime
-# and can break Developer ID signing.
-# Remove bundled PySide6 developer/helper apps that are not needed at runtime
-# and can break Developer ID signing.
-# Remove bundled PySide6 developer/helper apps that are not needed at runtime
-# and can break Developer ID signing.
-# Remove bundled PySide6 developer/helper apps that are not needed at runtime
-# and can break Developer ID signing.
 find "$APP_PATH" \
   \( \
     -name "Assistant__dot__app" -o \
@@ -104,25 +116,35 @@ find "$APP_PATH" \
   -prune \
   -exec rm -rf {} +
 
-# Keep user-specific runtime files outside the app bundle.
 mkdir -p "$HOME/Library/Application Support/${APP_NAME}"
 mkdir -p "$HOME/Library/Logs/${APP_NAME}"
 
-if [[ -n "$SIGN_IDENTITY" ]]; then
-  echo "==> Signing app with: $SIGN_IDENTITY"
-  codesign \
-    --force \
-    --deep \
-    --options runtime \
-    --entitlements packaging/entitlements.plist \
-    --sign "$SIGN_IDENTITY" \
-    "$APP_PATH"
+echo "==> Signing app with: $SIGN_IDENTITY"
+codesign \
+  --force \
+  --deep \
+  --timestamp \
+  --options runtime \
+  --entitlements packaging/entitlements.plist \
+  --sign "$SIGN_IDENTITY" \
+  "$APP_PATH"
 
-  codesign --verify --deep --strict --verbose=2 "$APP_PATH"
-else
-  echo "==> No SIGN_IDENTITY provided; applying ad-hoc signature for local testing."
-  codesign --force --deep --sign - "$APP_PATH"
-fi
+codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+
+echo "==> Notarizing app bundle"
+APP_ZIP="release/${APP_NAME// /_}_app.zip"
+ditto -c -k --keepParent "$APP_PATH" "$APP_ZIP"
+
+xcrun notarytool submit "$APP_ZIP" \
+  --apple-id "$APPLE_ID" \
+  --team-id "$APPLE_TEAM_ID" \
+  --password "$APPLE_APP_PASSWORD" \
+  --wait
+
+echo "==> Stapling app"
+xcrun stapler staple "$APP_PATH"
+xcrun stapler validate "$APP_PATH"
+spctl -a -vvv -t exec "$APP_PATH" | grep "accepted" >/dev/null || die "App failed Gatekeeper validation."
 
 echo "==> Creating polished drag-to-Applications DMG with dmgbuild"
 
@@ -134,9 +156,6 @@ rm -f "$DMG_PATH"
 rm -rf "$DMG_STAGE"
 mkdir -p "$DMG_STAGE"
 
-# Stage ONLY user-visible installer items.
-# The background is referenced from packaging/dmg_background.png so it does not
-# appear as a loose file in the mounted DMG.
 ditto "$APP_PATH" "$DMG_STAGE/${APP_NAME}.app"
 
 mkdir -p "$DMG_STAGE/.background"
@@ -151,10 +170,6 @@ fi
 echo "==> App size: ${APP_SIZE_MB} MB | DMG size: ${DMG_SIZE_MB} MB"
 
 cat > "$DMG_SETTINGS" <<PYSETTINGS
-# Generated by packaging/build_macos_release.sh
-# dmgbuild writes Finder .DS_Store layout metadata directly.
-# Visible installer items are intentionally limited to the app and Applications alias.
-
 format = 'UDZO'
 size = '${DMG_SIZE_MB}M'
 filesystem = 'HFS+'
@@ -203,33 +218,32 @@ PYSETTINGS
 rm -rf "$DMG_STAGE"
 rm -f "$DMG_SETTINGS"
 
-if [[ ! -f "$DMG_PATH" ]]; then
-  echo "DMG was not created at expected path: $DMG_PATH"
-  exit 1
+[[ -f "$DMG_PATH" ]] || die "DMG was not created."
+
+DMG_ACTUAL_SIZE_MB="$(du -sm "$DMG_PATH" | awk '{print $1}')"
+echo "==> Final DMG actual size: ${DMG_ACTUAL_SIZE_MB} MB"
+
+if [[ "$DMG_ACTUAL_SIZE_MB" -lt 100 ]]; then
+  die "DMG is suspiciously tiny (${DMG_ACTUAL_SIZE_MB} MB). Refusing to sign/notarize broken installer."
 fi
 
-if [[ -n "$SIGN_IDENTITY" ]]; then
-  echo "==> Signing DMG"
-  codesign --force --sign "$SIGN_IDENTITY" "$DMG_PATH"
-fi
+echo "==> Signing DMG"
+codesign --force --timestamp --sign "$SIGN_IDENTITY" "$DMG_PATH"
+codesign --verify --verbose=2 "$DMG_PATH"
 
-if [[ -n "$APPLE_ID" && -n "$APPLE_TEAM_ID" && -n "$APPLE_APP_PASSWORD" ]]; then
-  echo "==> Submitting DMG for Apple notarization"
-  xcrun notarytool submit "$DMG_PATH" \
-    --apple-id "$APPLE_ID" \
-    --team-id "$APPLE_TEAM_ID" \
-    --password "$APPLE_APP_PASSWORD" \
-    --wait
+echo "==> Submitting DMG for Apple notarization"
+xcrun notarytool submit "$DMG_PATH" \
+  --apple-id "$APPLE_ID" \
+  --team-id "$APPLE_TEAM_ID" \
+  --password "$APPLE_APP_PASSWORD" \
+  --wait
 
-  echo "==> Stapling notarization ticket"
-  xcrun stapler staple "$DMG_PATH"
-else
-  echo "==> Skipping notarization. Set APPLE_ID, APPLE_TEAM_ID, and APPLE_APP_PASSWORD to notarize."
-fi
+echo "==> Stapling DMG"
+xcrun stapler staple "$DMG_PATH"
+xcrun stapler validate "$DMG_PATH"
+
+spctl -a -vvv -t open --context context:primary-signature "$DMG_PATH" | grep "accepted" >/dev/null || die "DMG failed Gatekeeper validation."
 
 echo ""
-echo "DONE"
+echo "✅ DONE — signed, notarized, stapled release DMG only"
 echo "DMG created at: $DMG_PATH"
-echo ""
-echo "User install flow: open DMG -> drag BirdBros Recycle Co.app to Applications -> launch."
-echo "First launch may require Screen Recording permission in System Settings."

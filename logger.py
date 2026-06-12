@@ -16,15 +16,25 @@ import os
 import json
 import shutil
 from datetime import datetime, timedelta
+from pathlib import Path
 
 
 class Logger:
     def __init__(
         self,
-        log_dir="logs",
+        log_dir=None,
         text_log_file="birdbros.log",
         jsonl_log_file="birdbros.jsonl"
     ):
+        if log_dir is None:
+            log_dir = os.path.join(
+                os.path.expanduser("~"),
+                "Library",
+                "Application Support",
+                "BirdBros Recycle Co",
+                "logs"
+            )
+
         self.log_dir = log_dir
         self.text_log_file = text_log_file
         self.jsonl_log_file = jsonl_log_file
