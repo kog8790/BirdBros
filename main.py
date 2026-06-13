@@ -21,7 +21,6 @@ from collections import deque
 
 import cv2
 from dotenv import load_dotenv
-from PySide6.QtCore import Qt
 
 from cam_controller import cam_controller
 from bound_box_define import bound_box_define
@@ -233,11 +232,10 @@ def main():
         width=region["width"],
         height=status_height
     )
-
     panel.show()
     panel.raise_()
     panel.activateWindow()
-
+    
     status.keep_on_top()
 
     def bring_app_surfaces_to_front():
@@ -245,12 +243,7 @@ def main():
         overlay.raise_()
         status.keep_on_top()
         panel.raise_()
-
-    def lower_overlay_when_birdbros_inactive(state):
-        if state != Qt.ApplicationActive:
-            overlay.lower()
-            status.keep_on_top()
-
+            
     status.permanent_surface_clicked.connect(bring_app_surfaces_to_front)
     panel.permanent_surface_clicked.connect(bring_app_surfaces_to_front)
     
@@ -481,7 +474,6 @@ def main():
                     current_event_text = "Video Input Error"
                     logger.log_error("Video input update failed", error=str(e), video_input=current_video_config)
                     status.update_status(current_event_text, active_events=0, previous_status=previous_session_status)
-                    status.keep_on_top()
                     time.sleep(1 / 60)
                     continue
 
@@ -490,7 +482,6 @@ def main():
             if frame is None:
                 current_event_text = "No Frame"
                 status.update_status(current_event_text, active_events=0, previous_status=previous_session_status)
-                status.keep_on_top()
                 time.sleep(1 / 60)
                 continue
 
@@ -501,7 +492,7 @@ def main():
 
             behavior_mode = current_config.get(
                 "behavior_mode",
-                "advanced"
+                "simple"
             )
 
             subject_roi = current_config["subject_roi"]
@@ -639,7 +630,6 @@ def main():
                     object_roi=object_path,
                     combined_roi=combined_path
                 )
-
                 manual_capture_requested = False
 
             if detection_paused:
@@ -678,7 +668,6 @@ def main():
 
                 status.update_status("Paused", active_events=0, previous_status=previous_session_status)
                 overlay.update_frame(overlay_frame)
-                status.keep_on_top()
                 time.sleep(1 / 60)
                 continue
 
@@ -724,7 +713,6 @@ def main():
 
                 status.update_status(banner_text, active_events=0, previous_status=previous_session_status)
                 overlay.update_frame(overlay_frame)
-                status.keep_on_top()
                 time.sleep(1 / 60)
                 continue
 
@@ -863,7 +851,7 @@ def main():
 
                         behavior_mode = current_config.get(
                             "behavior_mode",
-                            "advanced"
+                            "simple"
                         )
 
                         reward_description = current_config.get(
@@ -1010,7 +998,6 @@ def main():
 
             status.update_status(current_event_text, active_events=active_event_count, previous_status=previous_session_status)
             overlay.update_frame(overlay_frame)
-            status.keep_on_top()
             time.sleep(1 / 60)
 
     except KeyboardInterrupt:

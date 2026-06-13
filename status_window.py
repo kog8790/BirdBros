@@ -130,8 +130,7 @@ class status_window(QWidget):
         self.status_label.setText(
             f"{current_status} | Events: {active_events} | Prev: {previous_status}"
         )
-        self.keep_on_top()
-
+        
     def keep_on_top(self):
         self.show()
         self.raise_()
