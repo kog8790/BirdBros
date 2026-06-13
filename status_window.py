@@ -65,9 +65,10 @@ class status_window(QWidget):
         )
 
         self.setWindowFlags(
+            Qt.Window |
+            Qt.FramelessWindowHint |
             Qt.WindowStaysOnTopHint |
-            Qt.Tool |
-            Qt.FramelessWindowHint
+            Qt.WindowDoesNotAcceptFocus
         )
 
         self.setAttribute(Qt.WA_ShowWithoutActivating, True)
