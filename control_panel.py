@@ -37,7 +37,6 @@ from PySide6.QtWidgets import (
 
 from config_manager import DEFAULT_CONFIG, load_config, save_config
 
-
 class control_panel(QWidget):
     config_changed = Signal(dict)
     exit_requested = Signal()
@@ -45,7 +44,7 @@ class control_panel(QWidget):
     detection_paused_changed = Signal(bool)
     permanent_surface_clicked = Signal()
 
-    def __init__(self, config_path="birdbros_config.json"):
+    def __init__(self, config_path=None):
         super().__init__()
 
         self.config_path = config_path

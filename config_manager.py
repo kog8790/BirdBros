@@ -17,7 +17,7 @@ Centralize configuration so runtime, UI, reward behavior, and prompt labels shar
 
 import json
 import os
-
+from pathlib import Path
 
 """ ### SEGMENT: DEFAULT CONFIG DEFINITION ###
 Defines the base system config.
@@ -110,6 +110,19 @@ def _deep_merge(default, loaded):
     return merged
 
 
+def get_default_config_path():
+    support_dir = Path.home() / "Library" / "Application Support" / "BirdBros Recycle Co"
+    support_dir.mkdir(parents=True, exist_ok=True)
+    return str(support_dir / "birdbros_config.json")
+
+
+def resolve_config_path(config_path=None):
+    if config_path:
+        return config_path
+
+    return get_default_config_path()
+
+
 def merge_with_defaults(loaded):
     return _deep_merge(DEFAULT_CONFIG, loaded)
 
@@ -117,7 +130,9 @@ def merge_with_defaults(loaded):
 """ ### SEGMENT: LOAD CONFIG ###
 load_config():
 Loads config from disk. Falls back to defaults if missing or invalid. """
-def load_config(config_path="birdbros_config.json"):
+def load_config(config_path=None):
+    config_path = resolve_config_path(config_path)
+
     if not os.path.exists(config_path):
         return deep_copy_config(DEFAULT_CONFIG)
 
@@ -128,14 +143,15 @@ def load_config(config_path="birdbros_config.json"):
     except Exception:
         return deep_copy_config(DEFAULT_CONFIG)
 
-
 """ ### SEGMENT: SAVE CONFIG ###
 save_config():
 Writes current config state to disk as JSON. """
-def save_config(config, config_path="birdbros_config.json"):
+def save_config(config, config_path=None):
+    config_path = resolve_config_path(config_path)
+    os.makedirs(os.path.dirname(config_path), exist_ok=True)
+
     with open(config_path, "w", encoding="utf-8") as f:
         json.dump(config, f, indent=2)
-
 
 """ ### SEGMENT: SYSTEM CONTEXT ###
 FLOW:
