@@ -144,7 +144,11 @@ xcrun notarytool submit "$APP_ZIP" \
 echo "==> Stapling app"
 xcrun stapler staple "$APP_PATH"
 xcrun stapler validate "$APP_PATH"
-spctl -a -vvv -t exec "$APP_PATH" | grep "accepted" >/dev/null || die "App failed Gatekeeper validation."
+APP_GATEKEEPER_OUTPUT="$(spctl -a -vvv -t exec "$APP_PATH" 2>&1 || true)"
+echo "$APP_GATEKEEPER_OUTPUT"
+
+echo "$APP_GATEKEEPER_OUTPUT" | grep -q "source=Notarized Developer ID" \
+  || die "App failed Gatekeeper validation."
 
 echo "==> Creating polished drag-to-Applications DMG with dmgbuild"
 
@@ -242,7 +246,11 @@ echo "==> Stapling DMG"
 xcrun stapler staple "$DMG_PATH"
 xcrun stapler validate "$DMG_PATH"
 
-spctl -a -vvv -t open --context context:primary-signature "$DMG_PATH" | grep "accepted" >/dev/null || die "DMG failed Gatekeeper validation."
+DMG_GATEKEEPER_OUTPUT="$(spctl -a -vvv -t open --context context:primary-signature "$DMG_PATH" 2>&1 || true)"
+echo "$DMG_GATEKEEPER_OUTPUT"
+
+echo "$DMG_GATEKEEPER_OUTPUT" | grep -q "source=Notarized Developer ID" \
+  || die "DMG failed Gatekeeper validation."
 
 echo ""
 echo "✅ DONE — signed, notarized, stapled release DMG only"

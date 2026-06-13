@@ -59,8 +59,8 @@ DEFAULT_CONFIG = {
     },
     "display": {
         "show_overlay": True,
-        "show_grid": True,
-        "show_coords": True,
+        "show_grid": False,
+        "show_coords": False,
         "show_capture_border": True,
         "show_labels": True
     },
@@ -70,7 +70,7 @@ DEFAULT_CONFIG = {
         "target_zone_label": "trash receptacle",
         "action_label": "depositing"
     },
-    "behavior_mode": "advanced",
+    "behavior_mode": "simple",
     "reward_description": "A bird drops litter into a receptacle.",
     "reward_action": {
         "mode": "debug_popup",

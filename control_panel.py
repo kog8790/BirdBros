@@ -693,6 +693,10 @@ class control_panel(QWidget):
     def _on_exit_clicked(self):
         self.exit_requested.emit()
 
+    def closeEvent(self, event):
+        self.exit_requested.emit()
+        event.accept()
+
     def emit_config(self):
         self.config_changed.emit(self.get_current_config())
 
@@ -862,7 +866,7 @@ class control_panel(QWidget):
         self.video_mode.setCurrentText(video_cfg.get("mode", "screen_capture"))
         self.video_path.setText(video_cfg.get("video_path", ""))
         self.video_loop.setChecked(video_cfg.get("loop_video", True))
-        self.video_fps.setValue(video_cfg.get("fps", 6))
+        self.video_fps.setValue(video_cfg.get("fps", 30))
 
         def pct_to_px(value_pct, total):
             return int(value_pct * total)
@@ -890,7 +894,7 @@ class control_panel(QWidget):
 
         task = cfg.get("task_labels", DEFAULT_CONFIG["task_labels"])
         self.behavior_mode.setCurrentText(
-            cfg.get("behavior_mode", "advanced")
+            cfg.get("behavior_mode", "simple")
         )
 
         self.reward_description.setText(
