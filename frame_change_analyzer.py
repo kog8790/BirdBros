@@ -129,14 +129,31 @@ class frame_change_analyzer:
         if previous is None or current is None:
             return self._empty_delta()
 
+        if (
+            not hasattr(previous, "size")
+            or not hasattr(current, "size")
+            or previous.size == 0
+            or current.size == 0
+        ):
+            return self._empty_delta()
+
+        previous_h, previous_w = previous.shape[:2]
+        current_h, current_w = current.shape[:2]
+
+        if previous_w <= 0 or previous_h <= 0 or current_w <= 0 or current_h <= 0:
+            return self._empty_delta()
+
         if previous.shape != current.shape:
             current = cv2.resize(
                 current,
-                (previous.shape[1], previous.shape[0]),
+                (previous_w, previous_h),
                 interpolation=cv2.INTER_AREA
             )
 
         delta = cv2.absdiff(previous, current)
+
+        if delta is None or not hasattr(delta, "size") or delta.size == 0:
+            return self._empty_delta()
 
         changed_mask = delta >= self.pixel_change_threshold
         changed_ratio = float(np.count_nonzero(changed_mask)) / float(delta.size)
