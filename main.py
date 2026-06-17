@@ -189,6 +189,8 @@ def main():
 
     current_event_text = "Paused"
     previous_session_status = "None"
+    api_event_count = 0
+    latest_api_storyboard_path = None
     prev_object_motion = False
 
     prev_region = region.copy()
@@ -302,7 +304,7 @@ def main():
         notes=""
     ):
         if storyboard.active:
-            storyboard.finalize(
+            return storyboard.finalize(
                 rewarded=rewarded,
                 label=label,
                 frame=frame,
@@ -310,6 +312,8 @@ def main():
                 object_frame=object_frame,
                 notes=notes
             )
+
+        return None
             
     # ================================
     # TRAJECTORY DUPLICATE SUPPRESSION
@@ -473,7 +477,13 @@ def main():
                 except Exception as e:
                     current_event_text = "Video Input Error"
                     logger.log_error("Video input update failed", error=str(e), video_input=current_video_config)
-                    status.update_status(current_event_text, active_events=0, previous_status=previous_session_status)
+                    status.update_status(
+                        current_event_text,
+                        active_events=0,
+                        api_events=api_event_count,
+                        previous_status=previous_session_status,
+                        storyboard_path=latest_api_storyboard_path
+                    )
                     time.sleep(1 / 60)
                     continue
 
@@ -481,7 +491,13 @@ def main():
 
             if frame is None:
                 current_event_text = "No Frame"
-                status.update_status(current_event_text, active_events=0, previous_status=previous_session_status)
+                status.update_status(
+                    current_event_text,
+                    active_events=0,
+                    api_events=api_event_count,
+                    previous_status=previous_session_status,
+                    storyboard_path=latest_api_storyboard_path
+                )
                 time.sleep(1 / 60)
                 continue
 
@@ -666,7 +682,13 @@ def main():
                 else:
                     overlay_frame = drawer.make_overlay_canvas(frame_w, frame_h)
 
-                status.update_status("Paused", active_events=0, previous_status=previous_session_status)
+                status.update_status(
+                    "Paused",
+                    active_events=0,
+                    api_events=api_event_count,
+                    previous_status=previous_session_status,
+                    storyboard_path=latest_api_storyboard_path
+                )
                 overlay.update_frame(overlay_frame)
                 time.sleep(1 / 60)
                 continue
@@ -711,7 +733,13 @@ def main():
                 else:
                     overlay_frame = drawer.make_overlay_canvas(frame_w, frame_h)
 
-                status.update_status(banner_text, active_events=0, previous_status=previous_session_status)
+                status.update_status(
+                    banner_text,
+                    active_events=0,
+                    api_events=api_event_count,
+                    previous_status=previous_session_status,
+                    storyboard_path=latest_api_storyboard_path
+                )
                 overlay.update_frame(overlay_frame)
                 time.sleep(1 / 60)
                 continue
@@ -798,8 +826,6 @@ def main():
                         f"PathLength={rejected_event.get_event_path_length():.1f}."
                     )
                 )
-
-                previous_session_status = "Rejected"
 
             ready_event = deposit_event_manager.get_next_ready_event()
 
@@ -937,12 +963,17 @@ def main():
                             action.reward(label=reward_label)
                             logger.log_reward(True, label=reward_label, reason=reason, bestFrameIndex=best_frame_index)
 
-                            finalize_storyboard_if_active(
+                            latest_storyboard_path = finalize_storyboard_if_active(
                                 rewarded=True,
                                 label=reward_label,
                                 frame=contact_sheet.copy(),
                                 notes=f"Reward triggered: True. Reason: {reason}. Justification: {justification}. bestFrameIndex={best_frame_index}"
                             )
+
+                            api_event_count += 1
+
+                            if latest_storyboard_path:
+                                latest_api_storyboard_path = latest_storyboard_path
 
                         else:
                             no_reward_label = object_label_result or "No reward"
@@ -952,12 +983,17 @@ def main():
                             action.no_reward(label=no_reward_label)
                             logger.log_reward(False, label=no_reward_label, reason=reason, bestFrameIndex=best_frame_index)
 
-                            finalize_storyboard_if_active(
+                            latest_storyboard_path = finalize_storyboard_if_active(
                                 rewarded=False,
                                 label=no_reward_label,
                                 frame=contact_sheet.copy(),
                                 notes=f"Reward triggered: False. Reason: {reason}. Justification: {justification}. bestFrameIndex={best_frame_index}"
                             )
+
+                            api_event_count += 1
+
+                            if latest_storyboard_path:
+                                latest_api_storyboard_path = latest_storyboard_path
 
                 except Exception as e:
                     current_event_text = "Deposit Event Error"
@@ -996,7 +1032,13 @@ def main():
             else:
                 overlay_frame = drawer.make_overlay_canvas(frame_w, frame_h)
 
-            status.update_status(current_event_text, active_events=active_event_count, previous_status=previous_session_status)
+            status.update_status(
+                current_event_text,
+                active_events=active_event_count,
+                api_events=api_event_count,
+                previous_status=previous_session_status,
+                storyboard_path=latest_api_storyboard_path
+            )
             overlay.update_frame(overlay_frame)
             time.sleep(1 / 60)
 

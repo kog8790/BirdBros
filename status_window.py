@@ -22,9 +22,9 @@ Capture-region geometry is used only to choose the active screen and vertical
 placement.
 """
 
-from PySide6.QtCore import Qt, QRect, QPoint, Signal
+from PySide6.QtCore import Qt, QRect, QPoint, Signal, QUrl
 from PySide6.QtWidgets import QLabel, QHBoxLayout, QWidget, QGraphicsDropShadowEffect, QApplication
-from PySide6.QtGui import QColor
+from PySide6.QtGui import QColor, QDesktopServices
 
 
 class status_window(QWidget):
@@ -75,10 +75,21 @@ class status_window(QWidget):
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.setAttribute(Qt.WA_StyledBackground, True)
 
-        self.status_label = QLabel("Warmup | Events: 0 | Prev: None")
+        self.latest_storyboard_path = None
+
+        self.status_label = QLabel("Warmup | Events: 0 | API: 0 | Prev: None")
         self.status_label.setObjectName("statusPortal")
         self.status_label.setAlignment(Qt.AlignCenter)
         self.status_label.setMinimumHeight(max(32, self.height_value - 14))
+
+        self.storyboard_link = QLabel('<a href="open_storyboard">Open Storyboard</a>')
+        self.storyboard_link.setObjectName("storyboardLink")
+        self.storyboard_link.setAlignment(Qt.AlignCenter)
+        self.storyboard_link.setTextFormat(Qt.RichText)
+        self.storyboard_link.setTextInteractionFlags(Qt.TextBrowserInteraction)
+        self.storyboard_link.setOpenExternalLinks(False)
+        self.storyboard_link.linkActivated.connect(self._open_latest_storyboard)
+        self.storyboard_link.hide()
 
         shadow = QGraphicsDropShadowEffect(self)
         shadow.setBlurRadius(28)
@@ -88,7 +99,9 @@ class status_window(QWidget):
 
         layout = QHBoxLayout()
         layout.setContentsMargins(8, 7, 8, 7)
+        layout.setSpacing(10)
         layout.addWidget(self.status_label)
+        layout.addWidget(self.storyboard_link)
 
         self.setLayout(layout)
         self._apply_visual_style()
@@ -113,6 +126,22 @@ class status_window(QWidget):
                 letter-spacing: 0.28px;
                 padding: 8px 22px;
             }
+
+            QLabel#storyboardLink {
+                color: #F8F3E7;
+                background-color: rgba(37, 48, 58, 218);
+                border: 1px solid rgba(255, 255, 255, 34);
+                border-radius: 14px;
+                font-family: "SF Pro Display", "Helvetica Neue", Arial;
+                font-size: 13px;
+                font-weight: 700;
+                padding: 7px 14px;
+            }
+
+            QLabel#storyboardLink a {
+                color: #F8F3E7;
+                text-decoration: none;
+            }
             """
         )
 
@@ -120,7 +149,9 @@ class status_window(QWidget):
         self,
         current_status: str,
         active_events: int = 0,
-        previous_status: str = "None"
+        api_events: int = 0,
+        previous_status: str = "None",
+        storyboard_path: str = None
     ):
         if not current_status:
             current_status = "Idle"
@@ -128,8 +159,24 @@ class status_window(QWidget):
         if not previous_status:
             previous_status = "None"
 
+        if storyboard_path:
+            self.latest_storyboard_path = storyboard_path
+
         self.status_label.setText(
-            f"{current_status} | Events: {active_events} | Prev: {previous_status}"
+            f"{current_status} | Events: {active_events} | API: {api_events} | Prev: {previous_status}"
+        )
+
+        if self.latest_storyboard_path:
+            self.storyboard_link.show()
+        else:
+            self.storyboard_link.hide()
+
+    def _open_latest_storyboard(self):
+        if not self.latest_storyboard_path:
+            return
+
+        QDesktopServices.openUrl(
+            QUrl.fromLocalFile(self.latest_storyboard_path)
         )
         
     def keep_on_top(self):
