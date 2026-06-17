@@ -117,11 +117,13 @@ class session_storyboard:
                 story_txt_path=os.path.join(self.session_dir, "story.txt")
             )
 
+        final_session_dir = self.session_dir
         self.active = False
+        return final_session_dir
 
     def abort(self, notes="Storyboard aborted"):
         if not self.active:
-            return
+            return None
 
         self.finalize(
             rewarded=False,
