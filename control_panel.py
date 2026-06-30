@@ -50,6 +50,7 @@ class control_panel(QWidget):
         self.config_path = config_path
         self.config = load_config(self.config_path)
         self.detection_paused = True
+        self._rebuilding_click_sequence = False
 
         self.setWindowTitle("Bird Bros Control Panel")
         self.setObjectName("birdbros_control_panel")
@@ -214,11 +215,21 @@ class control_panel(QWidget):
 
         self.reward_mode = QComboBox()
         self.reward_mode.addItems(["overlay_status", "mouse_click", "keyboard_shortcut", "webhook", "shell_command"])
+
+        # Legacy/default mouse-click widgets.
+        # These remain available internally so older configs can still load cleanly,
+        # but mouse_click mode now uses the dynamic click-sequence UI below.
         self.reward_x = self._make_spinbox(0, 10000)
         self.reward_y = self._make_spinbox(0, 10000)
-        self.reward_clicks = self._make_spinbox(1, 20)
+        self.reward_clicks = self._make_spinbox(0, 99)
         self.reward_interval_ms = self._make_spinbox(0, 10000)
         self.reward_move_duration_ms = self._make_spinbox(0, 10000)
+
+        self.reward_click_sequence_widgets = []
+        self.reward_click_sequence_container = QWidget()
+        self.reward_click_sequence_layout = QVBoxLayout(self.reward_click_sequence_container)
+        self.reward_click_sequence_layout.setContentsMargins(0, 0, 0, 0)
+        self.reward_click_sequence_layout.setSpacing(8)
 
         self.reward_keys = QLineEdit()
         self.reward_keys.setPlaceholderText("command,space")
@@ -249,6 +260,7 @@ class control_panel(QWidget):
         self.reward_clicks_row = self._make_reward_row("Mouse Clicks", self.reward_clicks)
         self.reward_interval_row = self._make_reward_row("Click Interval (ms)", self.reward_interval_ms)
         self.reward_move_duration_row = self._make_reward_row("Move Duration (ms)", self.reward_move_duration_ms)
+        self.reward_click_sequence_row = self._make_reward_row("Click Sequence", self.reward_click_sequence_container)
         self.reward_keys_row = self._make_reward_row("Shortcut Keys", self.reward_keys)
         self.reward_command_row = self._make_reward_row("Shell Command", self.reward_command)
         self.reward_url_row = self._make_reward_row("Webhook URL", self.reward_url)
@@ -264,6 +276,7 @@ class control_panel(QWidget):
         reward_layout.addWidget(self.reward_clicks_row)
         reward_layout.addWidget(self.reward_interval_row)
         reward_layout.addWidget(self.reward_move_duration_row)
+        reward_layout.addWidget(self.reward_click_sequence_row)
         reward_layout.addWidget(self.reward_keys_row)
         reward_layout.addWidget(self.reward_command_row)
         reward_layout.addWidget(self.reward_url_row)
@@ -553,11 +566,10 @@ class control_panel(QWidget):
             self.subject_x, self.subject_y, self.subject_w, self.subject_h,
             self.object_x, self.object_y, self.object_w, self.object_h,
             self.motion_min_area,
-            self.reward_x, self.reward_y, self.reward_clicks,
+            self.reward_x, self.reward_y,
             self.reward_interval_ms, self.reward_move_duration_ms,
             self.reward_timeout
         ]
-
         for widget in spinboxes:
             widget.valueChanged.connect(self._on_widget_changed)
 
@@ -653,6 +665,170 @@ class control_panel(QWidget):
 
         return row
 
+    def _make_click_sequence_step_row(self, index, step):
+        row = QWidget()
+        row_layout = QGridLayout(row)
+        row_layout.setContentsMargins(0, 0, 0, 0)
+        row_layout.setHorizontalSpacing(6)
+        row_layout.setVerticalSpacing(4)
+
+        title = QLabel(f"Click {index + 1}")
+        title.setObjectName("fieldLabel")
+
+        x_spin = self._make_spinbox(0, 10000)
+        y_spin = self._make_spinbox(0, 10000)
+        hold_spin = self._make_spinbox(0, 10000)
+        delay_spin = self._make_spinbox(0, 10000)
+        move_spin = self._make_spinbox(0, 10000)
+
+        x_spin.setValue(int(step.get("x", 735)))
+        y_spin.setValue(int(step.get("y", 586)))
+        hold_spin.setValue(int(float(step.get("hold_duration", 0.0)) * 1000))
+        delay_spin.setValue(int(float(step.get("delay_after", 0.1)) * 1000))
+        move_spin.setValue(int(float(step.get("move_duration", 0.0)) * 1000))
+
+        row_layout.addWidget(title, 0, 0, 1, 5)
+
+        row_layout.addWidget(QLabel("X"), 1, 0)
+        row_layout.addWidget(QLabel("Y"), 1, 1)
+        row_layout.addWidget(QLabel("Hold ms"), 1, 2)
+        row_layout.addWidget(QLabel("Delay ms"), 1, 3)
+        row_layout.addWidget(QLabel("Move ms"), 1, 4)
+
+        row_layout.addWidget(x_spin, 2, 0)
+        row_layout.addWidget(y_spin, 2, 1)
+        row_layout.addWidget(hold_spin, 2, 2)
+        row_layout.addWidget(delay_spin, 2, 3)
+        row_layout.addWidget(move_spin, 2, 4)
+
+        for spinbox in [x_spin, y_spin, hold_spin, delay_spin, move_spin]:
+            spinbox.valueChanged.connect(self._on_widget_changed)
+
+        widgets = {
+            "row": row,
+            "x": x_spin,
+            "y": y_spin,
+            "hold_duration": hold_spin,
+            "delay_after": delay_spin,
+            "move_duration": move_spin
+        }
+
+        return widgets
+
+    def _clear_click_sequence_rows(self):
+        while self.reward_click_sequence_layout.count():
+            item = self.reward_click_sequence_layout.takeAt(0)
+            widget = item.widget()
+
+            if widget:
+                widget.deleteLater()
+
+        self.reward_click_sequence_widgets = []
+
+    def _rebuild_click_sequence_rows(self, sequence):
+        self._rebuilding_click_sequence = True
+
+        self._clear_click_sequence_rows()
+
+        for index, step in enumerate(sequence):
+            widgets = self._make_click_sequence_step_row(index, step)
+            self.reward_click_sequence_widgets.append(widgets)
+            self.reward_click_sequence_layout.addWidget(widgets["row"])
+
+        self._rebuilding_click_sequence = False
+
+    def _get_click_sequence_from_widgets(self):
+        sequence = []
+
+        for widgets in self.reward_click_sequence_widgets:
+            sequence.append({
+                "x": widgets["x"].value(),
+                "y": widgets["y"].value(),
+                "hold_duration": widgets["hold_duration"].value() / 1000.0,
+                "delay_after": widgets["delay_after"].value() / 1000.0,
+                "move_duration": widgets["move_duration"].value() / 1000.0
+            })
+
+        return sequence
+
+    def _legacy_click_sequence_from_config(self, reward_cfg):
+        clicks = int(reward_cfg.get("clicks", 1))
+        clicks = max(0, min(99, clicks))
+
+        x = int(reward_cfg.get("x", 735))
+        y = int(reward_cfg.get("y", 586))
+        delay_after = float(reward_cfg.get("interval", 0.1))
+        move_duration = float(reward_cfg.get("move_duration", 0.0))
+
+        return [
+            {
+                "x": x,
+                "y": y,
+                "hold_duration": 0.0,
+                "delay_after": delay_after,
+                "move_duration": move_duration
+            }
+            for _ in range(clicks)
+        ]
+
+    def _click_sequence_from_config(self, reward_cfg):
+        sequence = reward_cfg.get("click_sequence")
+
+        if isinstance(sequence, list):
+            normalized_sequence = []
+
+            for step in sequence:
+                if not isinstance(step, dict):
+                    continue
+
+                normalized_sequence.append({
+                    "x": int(step.get("x", reward_cfg.get("x", 735))),
+                    "y": int(step.get("y", reward_cfg.get("y", 586))),
+                    "hold_duration": float(step.get("hold_duration", 0.0)),
+                    "delay_after": float(step.get("delay_after", reward_cfg.get("interval", 0.1))),
+                    "move_duration": float(step.get("move_duration", reward_cfg.get("move_duration", 0.0)))
+                })
+
+            return normalized_sequence[:99]
+
+        return self._legacy_click_sequence_from_config(reward_cfg)
+
+    def _load_click_sequence_into_widgets(self, reward_cfg):
+        sequence = self._click_sequence_from_config(reward_cfg)
+
+        self._rebuilding_click_sequence = True
+        self.reward_clicks.setValue(len(sequence))
+        self._rebuilding_click_sequence = False
+
+        self._rebuild_click_sequence_rows(sequence)
+
+    def _on_reward_click_count_changed(self):
+        if self._rebuilding_click_sequence:
+            return
+
+        existing_sequence = self._get_click_sequence_from_widgets()
+        target_count = self.reward_clicks.value()
+
+        if existing_sequence:
+            default_step = existing_sequence[-1].copy()
+        else:
+            default_step = {
+                "x": self.reward_x.value(),
+                "y": self.reward_y.value(),
+                "hold_duration": 0.0,
+                "delay_after": self.reward_interval_ms.value() / 1000.0,
+                "move_duration": self.reward_move_duration_ms.value() / 1000.0
+            }
+
+        while len(existing_sequence) < target_count:
+            existing_sequence.append(default_step.copy())
+
+        if len(existing_sequence) > target_count:
+            existing_sequence = existing_sequence[:target_count]
+
+        self._rebuild_click_sequence_rows(existing_sequence)
+        self._on_widget_changed()
+
     def _parse_keys(self, text):
         return [part.strip() for part in text.split(",") if part.strip()]
 
@@ -711,11 +887,14 @@ class control_panel(QWidget):
         command_visible = action_type == "shell_command"
         webhook_visible = action_type == "webhook"
 
-        self.reward_x_row.setVisible(mouse_visible)
-        self.reward_y_row.setVisible(mouse_visible)
+        # Legacy flat mouse fields stay hidden.
+        # The dynamic click sequence is the active mouse-click UI.
+        self.reward_x_row.setVisible(False)
+        self.reward_y_row.setVisible(False)
         self.reward_clicks_row.setVisible(mouse_visible)
-        self.reward_interval_row.setVisible(mouse_visible)
-        self.reward_move_duration_row.setVisible(mouse_visible)
+        self.reward_interval_row.setVisible(False)
+        self.reward_move_duration_row.setVisible(False)
+        self.reward_click_sequence_row.setVisible(mouse_visible)
 
         self.reward_keys_row.setVisible(keyboard_visible)
 
@@ -783,6 +962,18 @@ class control_panel(QWidget):
 
         default_task = DEFAULT_CONFIG["task_labels"]
 
+        click_sequence = self._get_click_sequence_from_widgets()
+
+        if click_sequence:
+            first_click = click_sequence[0]
+        else:
+            first_click = {
+                "x": self.reward_x.value(),
+                "y": self.reward_y.value(),
+                "delay_after": self.reward_interval_ms.value() / 1000.0,
+                "move_duration": self.reward_move_duration_ms.value() / 1000.0
+            }
+
         return {
             "capture_region": {
                 "left": self.capture_left.value(),
@@ -831,11 +1022,17 @@ class control_panel(QWidget):
 
             "reward_action": {
                 "mode": self.reward_mode.currentText(),
-                "x": self.reward_x.value(),
-                "y": self.reward_y.value(),
+
+                # Legacy/default fields preserved for compatibility.
+                "x": first_click["x"],
+                "y": first_click["y"],
                 "clicks": self.reward_clicks.value(),
-                "interval": self.reward_interval_ms.value() / 1000.0,
-                "move_duration": self.reward_move_duration_ms.value() / 1000.0,
+                "interval": first_click.get("delay_after", 0.0),
+                "move_duration": first_click.get("move_duration", 0.0),
+
+                # New executable click choreography.
+                "click_sequence": click_sequence,
+
                 "keys": self._parse_keys(self.reward_keys.text()),
                 "command": self.reward_command.text().strip(),
                 "url": self.reward_url.text().strip(),
@@ -914,11 +1111,23 @@ class control_panel(QWidget):
             reward_mode = "overlay_status"
         
         self.reward_mode.setCurrentText(reward_mode)
-        self.reward_x.setValue(reward_cfg.get("x", 735))
-        self.reward_y.setValue(reward_cfg.get("y", 586))
-        self.reward_clicks.setValue(reward_cfg.get("clicks", 3))
-        self.reward_interval_ms.setValue(int(reward_cfg.get("interval", 0.1) * 1000))
-        self.reward_move_duration_ms.setValue(int(reward_cfg.get("move_duration", 0.0) * 1000))
+
+        self._load_click_sequence_into_widgets(reward_cfg)
+
+        click_sequence = self._get_click_sequence_from_widgets()
+
+        if click_sequence:
+            first_click = click_sequence[0]
+            self.reward_x.setValue(first_click.get("x", 735))
+            self.reward_y.setValue(first_click.get("y", 586))
+            self.reward_interval_ms.setValue(int(first_click.get("delay_after", 0.1) * 1000))
+            self.reward_move_duration_ms.setValue(int(first_click.get("move_duration", 0.0) * 1000))
+        else:
+            self.reward_x.setValue(reward_cfg.get("x", 735))
+            self.reward_y.setValue(reward_cfg.get("y", 586))
+            self.reward_interval_ms.setValue(int(reward_cfg.get("interval", 0.1) * 1000))
+            self.reward_move_duration_ms.setValue(int(reward_cfg.get("move_duration", 0.0) * 1000))
+
         self.reward_keys.setText(",".join(reward_cfg.get("keys", ["command", "space"])))
         self.reward_command.setText(reward_cfg.get("command", ""))
         self.reward_url.setText(reward_cfg.get("url", ""))
