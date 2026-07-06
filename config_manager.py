@@ -74,11 +74,39 @@ DEFAULT_CONFIG = {
     "reward_description": "A bird drops litter into a receptacle.",
     "reward_action": {
         "mode": "debug_popup",
+        # Legacy/default mouse-click fields.
+        # Kept for backward compatibility with existing saved configs.
         "x": 735,
         "y": 586,
         "clicks": 3,
         "interval": 0.1,
         "move_duration": 0.0,
+        # New configurable mouse-click sequence.
+        # Mouse Clicks in the UI controls how many steps are active.
+        "click_sequence": [
+            {
+                "x": 735,
+                "y": 586,
+                "hold_duration": 0.0,
+                "delay_after": 0.1,
+                "move_duration": 0.0
+            },
+            {
+                "x": 735,
+                "y": 586,
+                "hold_duration": 0.0,
+                "delay_after": 0.1,
+                "move_duration": 0.0
+            },
+            {
+                "x": 735,
+                "y": 586,
+                "hold_duration": 0.0,
+                "delay_after": 0.1,
+                "move_duration": 0.0
+            }
+        ],
+
         "keys": ["command", "space"],
         "command": "",
         "url": "",

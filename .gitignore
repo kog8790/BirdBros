@@ -231,3 +231,6 @@ release/
 .venv_build/
 manual_captures/
 storyboards/
+
+# Local demo reset script
+reset_birdbros_demo.sh

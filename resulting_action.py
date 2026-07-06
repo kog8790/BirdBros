@@ -88,6 +88,47 @@ class resulting_action:
             print("[ACTION] pyautogui is not installed. Cannot perform mouse_click action.")
             return
 
+        click_sequence = action_config.get("click_sequence")
+
+        if isinstance(click_sequence, list):
+            self._mouse_click_sequence_action(click_sequence)
+            return
+
+        self._legacy_mouse_click_action(action_config)
+
+    def _mouse_click_sequence_action(self, click_sequence: list):
+        if not click_sequence:
+            print("[ACTION] mouse_click sequence is empty. No action performed.")
+            return
+
+        for index, step in enumerate(click_sequence, start=1):
+            if not isinstance(step, dict):
+                print(f"[ACTION] Skipping invalid mouse click step #{index}.")
+                continue
+
+            x = step.get("x")
+            y = step.get("y")
+
+            if x is None or y is None:
+                print(f"[ACTION] Skipping mouse click step #{index}; missing x/y.")
+                continue
+
+            hold_duration = max(0.0, float(step.get("hold_duration", 0.0)))
+            delay_after = max(0.0, float(step.get("delay_after", 0.0)))
+            move_duration = max(0.0, float(step.get("move_duration", 0.0)))
+
+            pyautogui.moveTo(x, y, duration=move_duration)
+            pyautogui.mouseDown(x, y)
+
+            if hold_duration > 0:
+                pyautogui.sleep(hold_duration)
+
+            pyautogui.mouseUp(x, y)
+
+            if delay_after > 0:
+                pyautogui.sleep(delay_after)
+
+    def _legacy_mouse_click_action(self, action_config: dict):
         x = action_config.get("x")
         y = action_config.get("y")
         clicks = int(action_config.get("clicks", 1))
