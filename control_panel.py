@@ -260,7 +260,7 @@ class control_panel(QWidget):
         self.reward_clicks_row = self._make_reward_row("Mouse Clicks", self.reward_clicks)
         self.reward_interval_row = self._make_reward_row("Click Interval (ms)", self.reward_interval_ms)
         self.reward_move_duration_row = self._make_reward_row("Move Duration (ms)", self.reward_move_duration_ms)
-        self.reward_click_sequence_row = self._make_reward_row("Click Sequence", self.reward_click_sequence_container)
+        self.reward_click_sequence_row = self._make_full_width_reward_row("Click Sequence", self.reward_click_sequence_container)
         self.reward_keys_row = self._make_reward_row("Shortcut Keys", self.reward_keys)
         self.reward_command_row = self._make_reward_row("Shell Command", self.reward_command)
         self.reward_url_row = self._make_reward_row("Webhook URL", self.reward_url)
@@ -439,6 +439,18 @@ class control_panel(QWidget):
                 color: rgba(236, 232, 221, 165);
                 font-size: 12px;
                 font-weight: 550;
+            }
+
+            QLabel#clickSequenceTitle {
+                color: #F5EEDC;
+                font-size: 12px;
+                font-weight: 700;
+            }
+
+            QWidget#clickSequenceStep {
+                background-color: rgba(255, 255, 255, 10);
+                border: 1px solid rgba(255, 255, 255, 20);
+                border-radius: 12px;
             }
 
             QLabel#footerStatus {
@@ -665,15 +677,34 @@ class control_panel(QWidget):
 
         return row
 
+    def _make_full_width_reward_row(self, label_text, widget):
+        row = QWidget()
+        row_layout = QVBoxLayout(row)
+        row_layout.setContentsMargins(0, 0, 0, 0)
+        row_layout.setSpacing(6)
+
+        label = QLabel(label_text)
+        label.setObjectName("fieldLabel")
+        label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+
+        widget.setMinimumWidth(0)
+        widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Maximum)
+
+        row_layout.addWidget(label)
+        row_layout.addWidget(widget)
+
+        return row
+
     def _make_click_sequence_step_row(self, index, step):
         row = QWidget()
-        row_layout = QGridLayout(row)
-        row_layout.setContentsMargins(0, 0, 0, 0)
-        row_layout.setHorizontalSpacing(6)
-        row_layout.setVerticalSpacing(4)
+        row.setObjectName("clickSequenceStep")
+
+        row_layout = QVBoxLayout(row)
+        row_layout.setContentsMargins(8, 8, 8, 8)
+        row_layout.setSpacing(6)
 
         title = QLabel(f"Click {index + 1}")
-        title.setObjectName("fieldLabel")
+        title.setObjectName("clickSequenceTitle")
 
         x_spin = self._make_spinbox(0, 10000)
         y_spin = self._make_spinbox(0, 10000)
@@ -681,25 +712,49 @@ class control_panel(QWidget):
         delay_spin = self._make_spinbox(0, 10000)
         move_spin = self._make_spinbox(0, 10000)
 
+        for spinbox in [x_spin, y_spin, hold_spin, delay_spin, move_spin]:
+            spinbox.setMinimumWidth(0)
+            spinbox.setMaximumWidth(92)
+            spinbox.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
         x_spin.setValue(int(step.get("x", 735)))
         y_spin.setValue(int(step.get("y", 586)))
         hold_spin.setValue(int(float(step.get("hold_duration", 0.0)) * 1000))
         delay_spin.setValue(int(float(step.get("delay_after", 0.1)) * 1000))
         move_spin.setValue(int(float(step.get("move_duration", 0.0)) * 1000))
 
-        row_layout.addWidget(title, 0, 0, 1, 5)
+        position_layout = QGridLayout()
+        position_layout.setContentsMargins(0, 0, 0, 0)
+        position_layout.setHorizontalSpacing(8)
+        position_layout.setVerticalSpacing(3)
 
-        row_layout.addWidget(QLabel("X"), 1, 0)
-        row_layout.addWidget(QLabel("Y"), 1, 1)
-        row_layout.addWidget(QLabel("Hold ms"), 1, 2)
-        row_layout.addWidget(QLabel("Delay ms"), 1, 3)
-        row_layout.addWidget(QLabel("Move ms"), 1, 4)
+        timing_layout = QGridLayout()
+        timing_layout.setContentsMargins(0, 0, 0, 0)
+        timing_layout.setHorizontalSpacing(8)
+        timing_layout.setVerticalSpacing(3)
 
-        row_layout.addWidget(x_spin, 2, 0)
-        row_layout.addWidget(y_spin, 2, 1)
-        row_layout.addWidget(hold_spin, 2, 2)
-        row_layout.addWidget(delay_spin, 2, 3)
-        row_layout.addWidget(move_spin, 2, 4)
+        position_layout.addWidget(QLabel("X"), 0, 0)
+        position_layout.addWidget(QLabel("Y"), 0, 1)
+        position_layout.addWidget(x_spin, 1, 0)
+        position_layout.addWidget(y_spin, 1, 1)
+
+        timing_layout.addWidget(QLabel("Hold ms"), 0, 0)
+        timing_layout.addWidget(QLabel("Delay ms"), 0, 1)
+        timing_layout.addWidget(QLabel("Move ms"), 0, 2)
+        timing_layout.addWidget(hold_spin, 1, 0)
+        timing_layout.addWidget(delay_spin, 1, 1)
+        timing_layout.addWidget(move_spin, 1, 2)
+
+        position_layout.setColumnStretch(0, 1)
+        position_layout.setColumnStretch(1, 1)
+
+        timing_layout.setColumnStretch(0, 1)
+        timing_layout.setColumnStretch(1, 1)
+        timing_layout.setColumnStretch(2, 1)
+
+        row_layout.addWidget(title)
+        row_layout.addLayout(position_layout)
+        row_layout.addLayout(timing_layout)
 
         for spinbox in [x_spin, y_spin, hold_spin, delay_spin, move_spin]:
             spinbox.valueChanged.connect(self._on_widget_changed)
