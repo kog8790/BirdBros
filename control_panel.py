@@ -913,10 +913,13 @@ class control_panel(QWidget):
         self.status_label.setText("Unsaved changes")
         self.emit_config()
 
-    def _mouse_click_accessibility_required(self):
-        return self.reward_mode.currentText().strip().lower() == "mouse_click"
+    def _automation_accessibility_required(self):
+        return self.reward_mode.currentText().strip().lower() in {
+            "mouse_click",
+            "keyboard_shortcut",
+        }
 
-    def _mouse_click_accessibility_ready(self):
+    def _automation_accessibility_ready(self):
         return accessibility_trusted()
 
     def _show_accessibility_required_dialog(self):
@@ -926,11 +929,11 @@ class control_panel(QWidget):
         message.setWindowTitle("Accessibility Permission Required")
         message.setIcon(QMessageBox.Warning)
         message.setText(
-            "Mouse click rewards require macOS Accessibility permission."
+            "This reward action requires macOS Accessibility permission."
         )
         message.setInformativeText(
             "BirdBros can detect events, but macOS will block automated "
-            "mouse clicks until Accessibility is enabled.\n\n"
+            "mouse clicks and keyboard shortcuts until Accessibility is enabled.\n\n"
             "Open Accessibility Settings, add or enable BirdBros Recycle Co, "
             "then quit and reopen BirdBros.\n\n"
             "If you are running from source, enable Terminal instead."
@@ -954,8 +957,8 @@ class control_panel(QWidget):
 
         if (
             starting_detection
-            and self._mouse_click_accessibility_required()
-            and not self._mouse_click_accessibility_ready()
+            and self._automation_accessibility_required()
+            and not self._automation_accessibility_ready()
         ):
             self.detection_paused = True
             self.start_pause_button.setText("Start Detection")
@@ -1017,8 +1020,11 @@ class control_panel(QWidget):
 
         self._on_widget_changed()
 
-        if mouse_visible and not self._mouse_click_accessibility_ready():
-            self.status_label.setText("Accessibility required for mouse_click")
+        if (
+            (mouse_visible or keyboard_visible)
+            and not self._automation_accessibility_ready()
+        ):
+            self.status_label.setText("Accessibility required for automated rewards")
         
     # ================================
     # DYNAMIC VIDEO INPUT UI
