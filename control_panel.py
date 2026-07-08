@@ -36,6 +36,11 @@ from PySide6.QtWidgets import (
 )
 
 from config_manager import DEFAULT_CONFIG, load_config, save_config
+from macos_permissions import (
+    accessibility_trusted,
+    request_accessibility_trust,
+    open_accessibility_settings,
+)
 
 class control_panel(QWidget):
     config_changed = Signal(dict)
@@ -907,8 +912,56 @@ class control_panel(QWidget):
         self.config = self.get_current_config()
         self.status_label.setText("Unsaved changes")
         self.emit_config()
-        
+
+    def _mouse_click_accessibility_required(self):
+        return self.reward_mode.currentText().strip().lower() == "mouse_click"
+
+    def _mouse_click_accessibility_ready(self):
+        return accessibility_trusted()
+
+    def _show_accessibility_required_dialog(self):
+        request_accessibility_trust(prompt=True)
+
+        message = QMessageBox(self)
+        message.setWindowTitle("Accessibility Permission Required")
+        message.setIcon(QMessageBox.Warning)
+        message.setText(
+            "Mouse click rewards require macOS Accessibility permission."
+        )
+        message.setInformativeText(
+            "BirdBros can detect events, but macOS will block automated "
+            "mouse clicks until Accessibility is enabled.\n\n"
+            "Open Accessibility Settings, add or enable BirdBros Recycle Co, "
+            "then quit and reopen BirdBros.\n\n"
+            "If you are running from source, enable Terminal instead."
+        )
+
+        open_button = message.addButton(
+            "Open Accessibility Settings",
+            QMessageBox.AcceptRole
+        )
+        message.addButton("Cancel", QMessageBox.RejectRole)
+
+        message.exec()
+
+        if message.clickedButton() == open_button:
+            open_accessibility_settings()
+
+        self.status_label.setText("Accessibility required for mouse_click")
+
     def _on_start_pause_clicked(self):
+        starting_detection = self.detection_paused
+
+        if (
+            starting_detection
+            and self._mouse_click_accessibility_required()
+            and not self._mouse_click_accessibility_ready()
+        ):
+            self.detection_paused = True
+            self.start_pause_button.setText("Start Detection")
+            self._show_accessibility_required_dialog()
+            return
+
         self.detection_paused = not self.detection_paused
 
         if self.detection_paused:
@@ -963,6 +1016,9 @@ class control_panel(QWidget):
         self.reward_payload_row.setVisible(webhook_visible)
 
         self._on_widget_changed()
+
+        if mouse_visible and not self._mouse_click_accessibility_ready():
+            self.status_label.setText("Accessibility required for mouse_click")
         
     # ================================
     # DYNAMIC VIDEO INPUT UI
