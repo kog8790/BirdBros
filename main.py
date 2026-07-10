@@ -110,7 +110,7 @@ def main():
     manual_capture_requested = False
     detection_paused = True
 
-    action = resulting_action(config=current_config)
+    action = resulting_action(config=current_config, logger=logger)
     storyboard = session_storyboard(logger=logger)
 
     def on_config_changed(new_config):

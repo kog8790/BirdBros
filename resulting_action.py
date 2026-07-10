@@ -41,13 +41,29 @@ reward():
 Executes configured reward action based on current mode (click, keypress, webhook, etc.).                                                          """
 
 class resulting_action:
-    def __init__(self, config: Optional[dict] = None):
+    def __init__(self, config: Optional[dict] = None, logger=None):
         self.config = config or {}
+        self.logger = logger
         self.reward_config = self.config.get("reward_action", {})
         self.no_reward_config = self.config.get("no_reward_action", {})
 
+    def _log_action(self, message: str, **data):
+        if self.logger:
+            try:
+                self.logger.log_event("action", message, **data)
+                return
+            except Exception as e:
+                print(f"[ACTION] Logger failed: {e}")
+
+        if data:
+            kv = " | ".join(f"{key}={value}" for key, value in data.items())
+            print(f"[ACTION] {message} | {kv}")
+        else:
+            print(f"[ACTION] {message}")
+
     def reward(self, label: str = "Success"):
         print(f"[REWARD] Triggered for label: {label}")
+        self._log_action("Reward action requested", label=label)
         self._dispatch(self.reward_config, label, is_reward=True)
 
     """         ### SEGMENT: NO-REWARD HANDLING ###
@@ -84,49 +100,147 @@ class resulting_action:
         print(f"[ACTION] Unknown mode '{mode}'. No action performed.")
 
     def _mouse_click_action(self, action_config: dict, label: str):
+        self._log_action(
+            "System interaction handler entered",
+            mode="mouse_click",
+            mechanism="pyautogui",
+            pyautogui_available=pyautogui is not None,
+            label=label
+        )
+
         if pyautogui is None:
-            print("[ACTION] pyautogui is not installed. Cannot perform mouse_click action.")
+            message = "System interaction unavailable; pyautogui is not installed."
+            print(f"[ACTION] {message}")
+            self._log_action(
+                message,
+                mode="mouse_click",
+                mechanism="pyautogui",
+                label=label
+            )
             return
 
         click_sequence = action_config.get("click_sequence")
 
         if isinstance(click_sequence, list):
+            self._log_action(
+                "System interaction sequence selected",
+                mode="mouse_click",
+                mechanism="pyautogui",
+                step_count=len(click_sequence),
+                label=label
+            )
             self._mouse_click_sequence_action(click_sequence)
             return
 
+        self._log_action(
+            "Legacy system interaction selected",
+            mode="mouse_click",
+            mechanism="pyautogui",
+            label=label
+        )
         self._legacy_mouse_click_action(action_config)
 
     def _mouse_click_sequence_action(self, click_sequence: list):
         if not click_sequence:
-            print("[ACTION] mouse_click sequence is empty. No action performed.")
+            message = "System interaction skipped; mouse_click sequence is empty."
+            print(f"[ACTION] {message}")
+            self._log_action(
+                message,
+                mode="mouse_click",
+                mechanism="pyautogui"
+            )
             return
+
+        self._log_action(
+            "System interaction sequence started",
+            mode="mouse_click",
+            mechanism="pyautogui",
+            step_count=len(click_sequence)
+        )
 
         for index, step in enumerate(click_sequence, start=1):
             if not isinstance(step, dict):
-                print(f"[ACTION] Skipping invalid mouse click step #{index}.")
+                print(f"[ACTION] Skipping invalid system interaction step #{index}.")
+                self._log_action(
+                    "System interaction step skipped",
+                    mode="mouse_click",
+                    mechanism="pyautogui",
+                    index=index,
+                    reason="invalid_step"
+                )
                 continue
 
             x = step.get("x")
             y = step.get("y")
 
             if x is None or y is None:
-                print(f"[ACTION] Skipping mouse click step #{index}; missing x/y.")
+                print(f"[ACTION] Skipping system interaction step #{index}; missing x/y.")
+                self._log_action(
+                    "System interaction step skipped",
+                    mode="mouse_click",
+                    mechanism="pyautogui",
+                    index=index,
+                    reason="missing_xy",
+                    x=x,
+                    y=y
+                )
                 continue
 
             hold_duration = max(0.0, float(step.get("hold_duration", 0.0)))
             delay_after = max(0.0, float(step.get("delay_after", 0.0)))
             move_duration = max(0.0, float(step.get("move_duration", 0.0)))
 
-            pyautogui.moveTo(x, y, duration=move_duration)
-            pyautogui.mouseDown(x, y)
+            self._log_action(
+                "System interaction step attempted",
+                mode="mouse_click",
+                mechanism="pyautogui",
+                index=index,
+                x=x,
+                y=y,
+                hold_duration=hold_duration,
+                delay_after=delay_after,
+                move_duration=move_duration
+            )
 
-            if hold_duration > 0:
-                pyautogui.sleep(hold_duration)
+            try:
+                pyautogui.moveTo(x, y, duration=move_duration)
+                pyautogui.mouseDown(x, y)
 
-            pyautogui.mouseUp(x, y)
+                if hold_duration > 0:
+                    pyautogui.sleep(hold_duration)
 
-            if delay_after > 0:
-                pyautogui.sleep(delay_after)
+                pyautogui.mouseUp(x, y)
+
+                if delay_after > 0:
+                    pyautogui.sleep(delay_after)
+
+                self._log_action(
+                    "System interaction step completed",
+                    mode="mouse_click",
+                    mechanism="pyautogui",
+                    index=index,
+                    x=x,
+                    y=y
+                )
+
+            except Exception as e:
+                self._log_action(
+                    "System interaction step failed",
+                    mode="mouse_click",
+                    mechanism="pyautogui",
+                    index=index,
+                    x=x,
+                    y=y,
+                    error=repr(e)
+                )
+                raise
+
+        self._log_action(
+            "System interaction sequence completed",
+            mode="mouse_click",
+            mechanism="pyautogui",
+            step_count=len(click_sequence)
+        )
 
     def _legacy_mouse_click_action(self, action_config: dict):
         x = action_config.get("x")
