@@ -15,10 +15,17 @@ Allow open-source users to tune both system geometry and AI task wording without
 """
 
 import json
-from PySide6.QtCore import Qt, Signal
+
+try:
+    import pyautogui
+except ImportError:
+    pyautogui = None
+
+from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtWidgets import (
     QApplication,
     QWidget,
+    QDialog,
     QVBoxLayout,
     QHBoxLayout,
     QGridLayout,
@@ -42,6 +49,99 @@ from macos_permissions import (
     open_accessibility_settings,
 )
 
+class MousePositionCaptureDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        self.captured_position = None
+
+        self.setWindowTitle("Capture Mouse Position")
+        self.setModal(True)
+        self.setWindowFlags(
+            Qt.FramelessWindowHint |
+            Qt.WindowStaysOnTopHint |
+            Qt.Tool
+        )
+        self.setAttribute(Qt.WA_TranslucentBackground, True)
+
+        screen = QApplication.primaryScreen()
+        if screen:
+            self.setGeometry(screen.virtualGeometry())
+
+        overlay_layout = QVBoxLayout(self)
+        overlay_layout.setContentsMargins(0, 0, 0, 0)
+        overlay_layout.setAlignment(Qt.AlignCenter)
+
+        card = QGroupBox("Capture Mouse Position")
+        card.setObjectName("capturePositionCard")
+        card.setMinimumWidth(380)
+        card.setMaximumWidth(460)
+
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(18, 18, 18, 18)
+        card_layout.setSpacing(10)
+
+        instructions = QLabel(
+            "Move your mouse to the target location.\n"
+            "Click once anywhere on screen to capture that position.\n"
+            "Press Esc to cancel."
+        )
+        instructions.setWordWrap(True)
+
+        self.position_label = QLabel("Current position: —")
+        self.screen_label = QLabel("Screen: —")
+        self.status_label = QLabel("Status: —")
+
+        card_layout.addWidget(instructions)
+        card_layout.addWidget(self.position_label)
+        card_layout.addWidget(self.screen_label)
+        card_layout.addWidget(self.status_label)
+
+        overlay_layout.addWidget(card)
+
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self._refresh_position)
+        self.timer.start(50)
+
+        self._refresh_position()
+
+    def _refresh_position(self):
+        if pyautogui is None:
+            self.position_label.setText("Current position: unavailable")
+            self.screen_label.setText("Screen: unavailable")
+            self.status_label.setText("Status: pyautogui is not available")
+            return
+
+        x, y = pyautogui.position()
+        width, height = pyautogui.size()
+        on_screen = pyautogui.onScreen(x, y)
+
+        self.position_label.setText(f"Current position: x={x}, y={y}")
+        self.screen_label.setText(f"Screen: {width} × {height}")
+        self.status_label.setText(
+            f"Status: {'valid on-screen coordinate' if on_screen else 'outside screen bounds'}"
+        )
+
+    def mousePressEvent(self, event):
+        if pyautogui is None:
+            self.reject()
+            return
+
+        x, y = pyautogui.position()
+
+        if not pyautogui.onScreen(x, y):
+            return
+
+        self.captured_position = (int(x), int(y))
+        self.accept()
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Escape:
+            self.reject()
+            return
+
+        super().keyPressEvent(event)
+        
 class control_panel(QWidget):
     config_changed = Signal(dict)
     exit_requested = Signal()
@@ -739,9 +839,14 @@ class control_panel(QWidget):
         timing_layout.setVerticalSpacing(3)
 
         position_layout.addWidget(QLabel("X"), 0, 0)
+        capture_button = QPushButton("Capture Position")
+        capture_button.setObjectName("secondaryButton")
+
+        position_layout.addWidget(QLabel("X"), 0, 0)
         position_layout.addWidget(QLabel("Y"), 0, 1)
         position_layout.addWidget(x_spin, 1, 0)
         position_layout.addWidget(y_spin, 1, 1)
+        position_layout.addWidget(capture_button, 2, 0, 1, 2)
 
         timing_layout.addWidget(QLabel("Hold ms"), 0, 0)
         timing_layout.addWidget(QLabel("Delay ms"), 0, 1)
@@ -761,6 +866,17 @@ class control_panel(QWidget):
         row_layout.addLayout(position_layout)
         row_layout.addLayout(timing_layout)
 
+        def capture_position():
+            dialog = MousePositionCaptureDialog(self)
+
+            if dialog.exec() == QDialog.Accepted and dialog.captured_position:
+                x, y = dialog.captured_position
+                x_spin.setValue(x)
+                y_spin.setValue(y)
+                self._on_widget_changed()
+
+        capture_button.clicked.connect(capture_position)
+
         for spinbox in [x_spin, y_spin, hold_spin, delay_spin, move_spin]:
             spinbox.valueChanged.connect(self._on_widget_changed)
 
@@ -768,6 +884,7 @@ class control_panel(QWidget):
             "row": row,
             "x": x_spin,
             "y": y_spin,
+            "capture_button": capture_button,
             "hold_duration": hold_spin,
             "delay_after": delay_spin,
             "move_duration": move_spin

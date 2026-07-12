@@ -1,0 +1,16 @@
+[project]
+name = "competitor-app"
+version = "0.1.0"
+description = "Screen/video behavior observer with AI judgment and safe reward actions"
+requires-python = ">=3.11"
+dependencies = [
+  "openai>=1.0.0",
+  "opencv-python>=4.8.0",
+  "numpy>=1.24.0",
+  "mss>=9.0.0",
+  "requests>=2.31.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

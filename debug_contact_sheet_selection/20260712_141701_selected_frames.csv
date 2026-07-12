@@ -1,0 +1,13 @@
+csv_row,event_record_index,event_elapsed_s,seconds_since_previous_record,seconds_since_previous_selected,source,selection_role,motion_detected,roi_delta,roi_changed_ratio,regional_delta,scene_delta,is_roi_novel,is_regionally_novel,is_scene_novel,is_meaningfully_different,dominant_region,importance_score,change_importance_score,centroid_motion_score,sharpness
+1,,0.000,0.000,0.000,pre,pre_start,False,0.000242,0.000000,0.000472,0.000300,False,False,False,False,{'row': 2; 'col': 1; 'score': 0.000613697199190442},0.089268,0.000308,0.000000,980.10
+2,,0.000,0.000,0.652,pre,pre_context,False,0.002819,0.003059,0.001248,0.000757,False,False,False,False,{'row': 0; 'col': 2; 'score': 0.0016485112563543935},0.091321,0.001783,0.000000,1158.63
+3,,0.000,0.000,0.616,pre,pre_context,False,0.106840,0.131715,0.053848,0.013949,True,True,False,True,{'row': 1; 'col': 1; 'score': 0.0863195775737396},0.197540,0.063730,0.000000,1120.25
+4,0,0.034,0.000,0.074,event,roi_change,True,0.201109,0.238697,0.112298,0.022724,True,True,True,True,{'row': 1; 'col': 1; 'score': 0.18529041805401403},0.271049,0.120912,0.000000,1127.81
+5,1,0.078,0.045,0.045,event,best_scene_change,True,0.157459,0.183910,0.142248,0.031306,True,True,True,True,{'row': 1; 'col': 1; 'score': 0.23273063599367705},0.277454,0.110263,0.122927,1115.42
+6,3,0.160,0.041,0.081,event,regional_change,False,0.000299,0.000000,0.068055,0.014838,False,True,False,True,{'row': 2; 'col': 1; 'score': 0.11170725337859894},0.069971,0.018939,0.000000,1141.22
+7,6,0.711,0.468,0.552,event,regional_change,False,0.000276,0.000000,0.031802,0.006241,False,True,False,True,{'row': 2; 'col': 1; 'score': 0.05278187634654306},0.059181,0.008669,0.000000,1133.83
+8,10,0.960,0.043,0.249,event,regional_change,False,0.000216,0.000000,0.028219,0.005490,False,True,False,True,{'row': 2; 'col': 1; 'score': 0.046872755761572106},0.058125,0.007663,0.000000,1172.03
+9,13,1.167,0.123,0.206,event,regional_change,False,0.000642,0.000000,0.028941,0.005993,False,True,False,True,{'row': 2; 'col': 1; 'score': 0.04777763269569759},0.058556,0.008175,0.000000,1160.67
+10,16,1.683,0.239,0.516,event,regional_change,False,0.000462,0.000000,0.056052,0.013777,False,True,False,True,{'row': 2; 'col': 1; 'score': 0.09071293334203825},0.066942,0.016241,0.000000,1136.15
+11,20,1.852,0.039,0.169,event,roi_change,False,0.063711,0.078125,0.044974,0.010558,True,True,False,True,{'row': 1; 'col': 1; 'score': 0.07305014630208859},0.081951,0.041360,0.000000,1121.32
+12,23,1.977,0.045,0.125,event,roi_change,False,0.099416,0.125000,0.047210,0.011543,True,True,False,True,{'row': 1; 'col': 1; 'score': 0.07625533918541687},0.093168,0.058219,0.000000,1151.55

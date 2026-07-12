@@ -179,7 +179,13 @@ def main():
     object_tracker = motion_object_tracker(min_area=motion_min_area)
     change_analyzer = frame_change_analyzer()
     deposit_event_manager = event_session_manager(distance_threshold=125, max_missing_frames=12)
-    sheet_builder = contact_sheet_builder(cell_width=220, cell_height=220, padding=6, show_index=True)
+    sheet_builder = contact_sheet_builder(
+        cell_width=220,
+        cell_height=220,
+        padding=6,
+        show_index=True,
+        show_frame_tags=True
+    )
     frame_ring_buffer = deque(maxlen=30)
     recent_event_paths = deque(maxlen=10)
 
@@ -839,11 +845,107 @@ def main():
                 try:
                     selected_frames = ready_event.get_contact_sheet_frames()
 
+                    # TEMP DEBUG: dump event timeline + selected contact sheet frame metadata.
+                    # Safe diagnostic only. Does not affect event/session/API/reward behavior.
+                    debug_dir = "debug_contact_sheet_selection"
+                    os.makedirs(debug_dir, exist_ok=True)
+
+                    debug_stamp = time.strftime("%Y%m%d_%H%M%S")
+
+                    def _debug_safe(value, default=""):
+                        if value is None:
+                            return default
+                        text = str(value)
+                        return text.replace(",", ";").replace("\n", " ").replace("\r", " ")
+
+                    def _debug_write_records_csv(path, records):
+                        with open(path, "w", encoding="utf-8") as f:
+                            f.write(
+                                "csv_row,"
+                                "event_record_index,"
+                                "event_elapsed_s,"
+                                "seconds_since_previous_record,"
+                                "seconds_since_previous_selected,"
+                                "source,"
+                                "selection_role,"
+                                "motion_detected,"
+                                "roi_delta,"
+                                "roi_changed_ratio,"
+                                "regional_delta,"
+                                "scene_delta,"
+                                "is_roi_novel,"
+                                "is_regionally_novel,"
+                                "is_scene_novel,"
+                                "is_meaningfully_different,"
+                                "dominant_region,"
+                                "importance_score,"
+                                "change_importance_score,"
+                                "centroid_motion_score,"
+                                "sharpness\n"
+                            )
+
+                            previous_selected_timestamp = None
+
+                            for csv_row, record in enumerate(records, start=1):
+                                timestamp = record.get("timestamp")
+
+                                if previous_selected_timestamp is not None and timestamp is not None:
+                                    seconds_since_previous_selected = timestamp - previous_selected_timestamp
+                                else:
+                                    seconds_since_previous_selected = 0.0
+
+                                if timestamp is not None:
+                                    previous_selected_timestamp = timestamp
+
+                                f.write(
+                                    f"{csv_row},"
+                                    f"{_debug_safe(record.get('event_record_index'))},"
+                                    f"{float(record.get('event_elapsed_s') or 0.0):.3f},"
+                                    f"{float(record.get('seconds_since_previous_record') or 0.0):.3f},"
+                                    f"{float(seconds_since_previous_selected):.3f},"
+                                    f"{_debug_safe(record.get('source'))},"
+                                    f"{_debug_safe(record.get('selection_role'))},"
+                                    f"{_debug_safe(record.get('motion_detected'))},"
+                                    f"{float(record.get('roi_delta') or 0.0):.6f},"
+                                    f"{float(record.get('roi_changed_ratio') or 0.0):.6f},"
+                                    f"{float(record.get('regional_delta') or 0.0):.6f},"
+                                    f"{float(record.get('scene_delta') or 0.0):.6f},"
+                                    f"{_debug_safe(record.get('is_roi_novel'))},"
+                                    f"{_debug_safe(record.get('is_regionally_novel'))},"
+                                    f"{_debug_safe(record.get('is_scene_novel'))},"
+                                    f"{_debug_safe(record.get('is_meaningfully_different'))},"
+                                    f"{_debug_safe(record.get('dominant_region'))},"
+                                    f"{float(record.get('importance_score') or 0.0):.6f},"
+                                    f"{float(record.get('change_importance_score') or 0.0):.6f},"
+                                    f"{float(record.get('centroid_motion_score') or 0.0):.6f},"
+                                    f"{float(record.get('sharpness') or 0.0):.2f}\n"
+                                )
+
+                    all_event_records_path = os.path.join(
+                        debug_dir,
+                        f"{debug_stamp}_all_event_records.csv"
+                    )
+
+                    selected_frames_path = os.path.join(
+                        debug_dir,
+                        f"{debug_stamp}_selected_frames.csv"
+                    )
+
+                    _debug_write_records_csv(all_event_records_path, ready_event.records)
+                    _debug_write_records_csv(selected_frames_path, selected_frames)
+
+                    logger.log_info(
+                        f"TEMP DEBUG contact sheet records dumped | "
+                        f"all_event_records={all_event_records_path} | "
+                        f"selected_frames={selected_frames_path} | "
+                        f"event_records={len(ready_event.records)} | "
+                        f"selected_frames={len(selected_frames)}"
+                    )
+
                     if not selected_frames:
                         logger.log_warning("Ready deposit event had no selected frames")
                     else:
                         centroid_path = ready_event.get_full_centroid_path()
-
                         if centroid_path:
                             recent_event_paths.append(centroid_path)
 

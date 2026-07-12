@@ -1,0 +1,13 @@
+sheet_index,source,selection_role,motion_detected,roi_delta,regional_delta,scene_delta,is_roi_novel,is_regionally_novel,is_scene_novel,dominant_region,importance_score,change_importance_score,sharpness
+1,pre,pre_start,False,0.001723,0.001789,0.001377,False,False,False,{'row': 2, 'col': 2, 'score': 0.0021296296296296298},0.085724,0.001615,888.51
+2,pre,pre_context,False,0.000370,0.000579,0.000383,False,False,False,{'row': 2, 'col': 2, 'score': 0.0007397504456327986},0.085884,0.000416,910.73
+3,pre,pre_context,False,0.100995,0.069087,0.013455,True,True,False,{'row': 1, 'col': 1, 'score': 0.11446093487855871},0.194956,0.063975,914.48
+4,event,event_start,True,0.157532,0.124661,0.023258,True,True,True,{'row': 1, 'col': 1, 'score': 0.20736804067831607},0.256808,0.103962,909.36
+5,event,regional_change,False,0.000322,0.050881,0.011531,False,True,False,{'row': 2, 'col': 1, 'score': 0.08312077489657956},0.061889,0.014357,936.17
+6,event,regional_change,False,0.000698,0.031579,0.006389,False,True,False,{'row': 2, 'col': 1, 'score': 0.05223186358591463},0.056931,0.008866,952.75
+7,event,regional_change,False,0.000606,0.030187,0.006063,False,True,False,{'row': 2, 'col': 1, 'score': 0.04996670366259711},0.056178,0.008432,946.49
+8,event,regional_change,False,0.004214,0.060406,0.015493,False,True,False,{'row': 2, 'col': 1, 'score': 0.09718746846937745},0.066497,0.019400,939.52
+9,event,roi_change,False,0.069310,0.055508,0.015951,True,True,False,{'row': 1, 'col': 1, 'score': 0.08780786206540536},0.082096,0.047874,891.55
+10,event,roi_change,False,0.096120,0.044785,0.010282,True,True,False,{'row': 1, 'col': 1, 'score': 0.0729592442505743},0.087073,0.055810,915.57
+11,event,roi_change,False,0.044770,0.019320,0.006374,True,False,False,{'row': 1, 'col': 0, 'score': 0.029848488759259734},0.065950,0.026241,932.73
+12,event,context,False,0.001671,0.002695,0.000969,False,False,False,{'row': 2, 'col': 1, 'score': 0.004108566239531833},0.049014,0.001630,952.68

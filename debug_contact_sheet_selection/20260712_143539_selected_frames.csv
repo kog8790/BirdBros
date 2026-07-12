@@ -1,0 +1,13 @@
+csv_row,event_record_index,event_elapsed_s,seconds_since_previous_record,seconds_since_previous_selected,source,selection_role,motion_detected,roi_delta,roi_changed_ratio,regional_delta,scene_delta,is_roi_novel,is_regionally_novel,is_scene_novel,is_meaningfully_different,dominant_region,importance_score,change_importance_score,centroid_motion_score,sharpness
+1,,0.000,0.000,0.000,pre,pre_start,False,0.000247,0.000000,0.031246,0.012348,False,True,False,True,{'row': 2; 'col': 1; 'score': 0.04691323366194424},0.095956,0.010682,0.000000,904.54
+2,,0.000,0.000,0.683,pre,pre_context,False,0.000637,0.000000,0.000835,0.000638,False,False,False,False,{'row': 2; 'col': 2; 'score': 0.0009983339741125208},0.090055,0.000677,0.000000,989.97
+3,,0.000,0.000,0.756,pre,pre_context,False,0.115414,0.141157,0.056239,0.016157,True,True,False,True,{'row': 1; 'col': 1; 'score': 0.08883193757777552},0.200300,0.068839,0.000000,981.84
+4,0,0.039,0.000,0.085,event,event_start,True,0.189331,0.227261,0.149517,0.030522,True,True,True,True,{'row': 1; 'col': 1; 'score': 0.24647765109474318},0.277084,0.125785,0.000000,973.75
+5,3,0.167,0.043,0.127,event,regional_change,False,0.000367,0.000000,0.090944,0.019417,False,True,False,True,{'row': 2; 'col': 1; 'score': 0.1496213357707123},0.076055,0.025150,0.000000,989.80
+6,7,0.798,0.094,0.632,event,regional_change,False,0.000430,0.000000,0.035986,0.007178,False,True,False,True,{'row': 2; 'col': 1; 'score': 0.05963112881112489},0.060455,0.009903,0.000000,1002.24
+7,10,0.956,0.052,0.158,event,regional_change,False,0.000230,0.000000,0.028222,0.005494,False,True,False,True,{'row': 2; 'col': 1; 'score': 0.04687602010837631},0.058131,0.007671,0.000000,1038.49
+8,14,1.206,0.048,0.250,event,regional_change,False,0.000603,0.000000,0.038913,0.007746,False,True,False,True,{'row': 2; 'col': 1; 'score': 0.06449304694130704},0.061342,0.010765,0.000000,1026.47
+9,17,1.671,0.301,0.465,event,regional_change,False,0.000604,0.000000,0.066343,0.015135,False,True,False,True,{'row': 2; 'col': 1; 'score': 0.10834367043154665},0.069745,0.018838,0.000000,1002.00
+10,20,1.823,0.048,0.152,event,roi_change,False,0.068375,0.085705,0.062240,0.015452,True,True,False,True,{'row': 1; 'col': 1; 'score': 0.10041973564726062},0.086269,0.048625,0.000000,951.98
+11,24,2.020,0.062,0.196,event,roi_change,False,0.087820,0.111037,0.039201,0.009960,True,True,False,True,{'row': 1; 'col': 1; 'score': 0.06300205159250663},0.087487,0.050845,0.000000,1004.55
+12,27,2.873,0.606,0.853,event,roi_change,False,0.014222,0.016822,0.009107,0.002713,False,False,False,False,{'row': 1; 'col': 1; 'score': 0.014326169575892106},0.057014,0.009171,0.000000,1025.23

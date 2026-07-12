@@ -1,0 +1,54 @@
+{
+  "developer_mode": false,
+  "openai_model": "gpt-4o",
+  "input": {
+    "kind": "screen_capture",
+    "screen_region": {
+      "left": 100,
+      "top": 100,
+      "width": 900,
+      "height": 700
+    },
+    "fps": 6,
+    "loop_video": true,
+    "video_path": ""
+  },
+  "subject_roi": {
+    "x_pct": 0.35,
+    "y_pct": 0.25,
+    "w_pct": 0.35,
+    "h_pct": 0.35
+  },
+  "object_roi": {
+    "x_pct": 0.40,
+    "y_pct": 0.55,
+    "w_pct": 0.25,
+    "h_pct": 0.20
+  },
+  "behavior": {
+    "mode": "simple",
+    "reward_description": "A bird drops litter into a receptacle.",
+    "subject_label": "non-human animal",
+    "object_label": "man-made litter or trash",
+    "target_zone_label": "trash receptacle",
+    "action_label": "depositing"
+  },
+  "motion": {
+    "min_area": 5000,
+    "warmup_seconds": 3.0,
+    "still_frames_to_end": 4,
+    "pre_event_frames": 12,
+    "max_event_frames": 60
+  },
+  "privacy": {
+    "save_diagnostics": false,
+    "diagnostics_dir": "diagnostics",
+    "retention_days": 7
+  },
+  "reward_action": {
+    "kind": "status"
+  },
+  "no_reward_action": {
+    "kind": "status"
+  }
+}

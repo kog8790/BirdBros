@@ -177,8 +177,19 @@ class event_session:
 
         change_metrics = change_metrics or {}
 
+        now = time.time()
+        event_record_index = len(self.records)
+
+        previous_timestamp = None
+        if self.records:
+            previous_timestamp = self.records[-1].get("timestamp")
+
         record = {
-            "timestamp": time.time(),
+            "timestamp": now,
+            "event_record_index": event_record_index,
+            "event_elapsed_s": (now - self.start_time) if self.start_time else 0.0,
+            "seconds_since_previous_record": (now - previous_timestamp) if previous_timestamp else 0.0,
+
             "combined_frame": combined_frame.copy(),
             "object_frame": object_frame.copy() if object_frame is not None else None,
             "centroid": centroid,
@@ -236,6 +247,10 @@ class event_session:
 
             copied_record = {
                 "timestamp": record.get("timestamp", time.time()),
+                "event_record_index": record.get("event_record_index"),
+                "event_elapsed_s": record.get("event_elapsed_s"),
+                "seconds_since_previous_record": record.get("seconds_since_previous_record"),
+
                 "combined_frame": combined_copy,
                 "object_frame": object_copy,
                 "subject_frame": record.get("subject_frame").copy() if record.get("subject_frame") is not None else None,
