@@ -15,6 +15,7 @@ Allow open-source users to tune both system geometry and AI task wording without
 """
 
 import json
+import os
 
 try:
     import pyautogui
@@ -22,6 +23,7 @@ except ImportError:
     pyautogui = None
 
 from PySide6.QtCore import Qt, Signal, QTimer
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QWidget,
@@ -39,7 +41,8 @@ from PySide6.QtWidgets import (
     QComboBox,
     QLineEdit,
     QScrollArea,
-    QSizePolicy
+    QSizePolicy,
+    QToolButton
 )
 
 from config_manager import DEFAULT_CONFIG, load_config, save_config
@@ -393,14 +396,17 @@ class control_panel(QWidget):
 
         reward_group.setLayout(reward_layout)
 
+        task_group.setTitle("Behavior")
+        reward_group.setTitle("Reward Action")
+
         button_grid = QGridLayout()
         button_grid.setSpacing(8)
 
         self.start_pause_button = QPushButton("Start Detection")
-        self.save_button = QPushButton("Save Config")
-        self.reload_button = QPushButton("Reload Config")
-        self.reset_button = QPushButton("Reset Defaults")
-        self.manual_capture_button = QPushButton("Manual ROI Capture")
+        self.save_button = QPushButton("Save")
+        self.reload_button = QPushButton("Reload")
+        self.reset_button = QPushButton("Reset")
+        self.manual_capture_button = QPushButton("ROI Capture")
         self.exit_button = QPushButton("Exit")
 
         for button in [
@@ -417,14 +423,12 @@ class control_panel(QWidget):
         self.reset_button.setObjectName("secondaryButton")
         self.manual_capture_button.setObjectName("secondaryButton")
 
-        button_grid.addWidget(self.start_pause_button, 0, 0)
-        button_grid.addWidget(self.save_button, 0, 1)
-
-        button_grid.addWidget(self.reload_button, 1, 0)
-        button_grid.addWidget(self.reset_button, 1, 1)
-
+        button_grid.addWidget(self.start_pause_button, 0, 0, 1, 2)
+        button_grid.addWidget(self.save_button, 1, 0)
+        button_grid.addWidget(self.reload_button, 1, 1)
         button_grid.addWidget(self.manual_capture_button, 2, 0)
-        button_grid.addWidget(self.exit_button, 2, 1)
+        button_grid.addWidget(self.reset_button, 2, 1)
+        button_grid.addWidget(self.exit_button, 3, 0, 1, 2)
 
         button_grid.setColumnStretch(0, 1)
         button_grid.setColumnStretch(1, 1)
@@ -433,30 +437,64 @@ class control_panel(QWidget):
         self.status_label.setObjectName("footerStatus")
         self.status_label.setAlignment(Qt.AlignCenter)
 
-        header_label = QLabel("BirdBros Recycle Co.")
-        header_label.setObjectName("appHeader")
-        header_label.setAlignment(Qt.AlignCenter)
-
-        subtitle_label = QLabel("Autonomous behavior reinforcement")
-        subtitle_label.setObjectName("appSubtitle")
-        subtitle_label.setAlignment(Qt.AlignCenter)
-
         for group in [
             capture_group, video_group, self.subject_group, self.object_group,
             motion_group, display_group, task_group, reward_group
         ]:
             group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Maximum)
 
-        main_layout.addWidget(header_label)
-        main_layout.addWidget(subtitle_label)
-        main_layout.addWidget(capture_group)
-        main_layout.addWidget(video_group)
-        main_layout.addWidget(self.subject_group)
-        main_layout.addWidget(self.object_group)
-        main_layout.addWidget(motion_group)
-        main_layout.addWidget(display_group)
+        main_layout.addWidget(self._make_sidebar_header())
         main_layout.addWidget(task_group)
         main_layout.addWidget(reward_group)
+
+        main_layout.addWidget(
+            self._make_collapsible_section(
+                "Display Options",
+                display_group,
+                expanded=True
+            )
+        )
+
+        main_layout.addWidget(
+            self._make_collapsible_section(
+                "Capture Region",
+                capture_group,
+                expanded=False
+            )
+        )
+
+        main_layout.addWidget(
+            self._make_collapsible_section(
+                "Video Input",
+                video_group,
+                expanded=False
+            )
+        )
+
+        main_layout.addWidget(
+            self._make_collapsible_section(
+                "Trigger ROI",
+                self.object_group,
+                expanded=False
+            )
+        )
+
+        main_layout.addWidget(
+            self._make_collapsible_section(
+                "Subject ROI",
+                self.subject_group,
+                expanded=False
+            )
+        )
+
+        main_layout.addWidget(
+            self._make_collapsible_section(
+                "Motion",
+                motion_group,
+                expanded=False
+            )
+        )
+
         main_layout.addLayout(button_grid)
         main_layout.addWidget(self.status_label)
 
@@ -473,8 +511,8 @@ class control_panel(QWidget):
 
         outer_layout = QVBoxLayout()
         outer_layout.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
-        outer_layout.setContentsMargins(12, 12, 12, 12)
-        outer_layout.setSpacing(10)
+        outer_layout.setContentsMargins(10, 10, 10, 10)
+        outer_layout.setSpacing(8)
         outer_layout.addWidget(scroll)
 
         self.setLayout(outer_layout)
@@ -484,25 +522,41 @@ class control_panel(QWidget):
         self.setStyleSheet(
             """
             QWidget#birdbros_control_panel {
-                background-color: #151719;
+                background-color: #101214;
                 color: #ECE8DD;
                 font-family: "SF Pro Display", "Helvetica Neue", Arial;
-                font-size: 13px;
+                font-size: 12px;
+            }
+
+            QWidget#sidebarHeader {
+                background-color: rgba(255, 255, 255, 12);
+                border: 1px solid rgba(255, 255, 255, 24);
+                border-radius: 18px;
+            }
+
+            QLabel#appIcon {
+                color: #F8F3E7;
+                font-size: 34px;
             }
 
             QLabel#appHeader {
                 color: #F8F3E7;
-                font-size: 24px;
-                font-weight: 700;
-                letter-spacing: 0.5px;
-                padding-top: 4px;
+                font-size: 22px;
+                font-weight: 800;
+                letter-spacing: 0.4px;
             }
 
             QLabel#appSubtitle {
-                color: rgba(236, 232, 221, 150);
-                font-size: 12px;
+                color: #F1D99B;
+                font-size: 13px;
+                font-weight: 700;
+                letter-spacing: 0.3px;
+            }
+
+            QLabel#appDescriptor {
+                color: rgba(236, 232, 221, 145);
+                font-size: 11px;
                 font-weight: 500;
-                padding-bottom: 4px;
             }
 
             QScrollArea {
@@ -514,26 +568,61 @@ class control_panel(QWidget):
                 background: transparent;
             }
 
+            QWidget#collapsibleSection {
+                background-color: transparent;
+                margin: 0px;
+                padding: 0px;
+            }
+
+            QToolButton#sectionHeader {
+                color: #F5EEDC;
+                background-color: rgba(255, 255, 255, 13);
+                border: 1px solid rgba(255, 255, 255, 24);
+                border-radius: 14px;
+                padding: 10px 12px;
+                font-size: 12px;
+                font-weight: 750;
+                text-align: left;
+                margin-top: 8px;
+            }
+
+            QToolButton#sectionHeader:hover {
+                background-color: rgba(255, 255, 255, 22);
+                border: 1px solid rgba(116, 215, 196, 95);
+            }
+
             QGroupBox {
-                background-color: rgba(255, 255, 255, 15);
-                border: 1px solid rgba(255, 255, 255, 30);
+                background-color: rgba(255, 255, 255, 14);
+                border: 1px solid rgba(255, 255, 255, 25);
                 border-radius: 16px;
-                margin-top: 18px;
+                margin-top: 12px;
                 padding: 14px 10px 10px 10px;
                 color: #F5EEDC;
-                font-size: 13px;
-                font-weight: 650;
+                font-size: 12px;
+                font-weight: 700;
             }
 
             QGroupBox::title {
                 subcontrol-origin: margin;
                 subcontrol-position: top left;
                 left: 12px;
-                top: 2px;
+                top: 1px;
                 padding: 0 8px;
                 color: #F1D99B;
-                background-color: #151719;
+                background-color: #101214;
                 border-radius: 8px;
+            }
+
+            QGroupBox#capturePositionCard {
+                background-color: #171B1D;
+                border: 1px solid rgba(116, 215, 196, 150);
+                border-radius: 18px;
+                color: #F8F3E7;
+            }
+
+            QGroupBox#capturePositionCard::title {
+                color: #F1D99B;
+                background-color: #171B1D;
             }
 
             QLabel {
@@ -542,19 +631,19 @@ class control_panel(QWidget):
 
             QLabel#fieldLabel {
                 color: rgba(236, 232, 221, 165);
-                font-size: 12px;
-                font-weight: 550;
+                font-size: 11px;
+                font-weight: 650;
             }
 
             QLabel#clickSequenceTitle {
                 color: #F5EEDC;
                 font-size: 12px;
-                font-weight: 700;
+                font-weight: 800;
             }
 
             QWidget#clickSequenceStep {
                 background-color: rgba(255, 255, 255, 10);
-                border: 1px solid rgba(255, 255, 255, 20);
+                border: 1px solid rgba(255, 255, 255, 22);
                 border-radius: 12px;
             }
 
@@ -563,39 +652,50 @@ class control_panel(QWidget):
                 background-color: rgba(255, 255, 255, 12);
                 border: 1px solid rgba(255, 255, 255, 22);
                 border-radius: 12px;
-                padding: 10px;
-                font-weight: 600;
+                padding: 9px;
+                font-size: 11px;
+                font-weight: 650;
             }
 
             QLineEdit, QSpinBox, QComboBox {
                 color: #F8F3E7;
-                background-color: rgba(255, 255, 255, 24);
+                background-color: rgba(255, 255, 255, 22);
                 border: 1px solid rgba(255, 255, 255, 34);
                 border-radius: 10px;
-                padding: 6px 8px;
+                padding: 6px 7px;
                 selection-background-color: #74D7C4;
                 selection-color: #101214;
             }
 
             QLineEdit:focus, QSpinBox:focus, QComboBox:focus {
                 border: 1px solid #74D7C4;
-                background-color: rgba(255, 255, 255, 32);
+                background-color: rgba(255, 255, 255, 31);
+            }
+
+            QComboBox QAbstractItemView {
+                color: #101214;
+                background-color: #F8F3E7;
+                selection-background-color: #74D7C4;
+                selection-color: #101214;
+                border: 1px solid rgba(0, 0, 0, 45);
+                outline: none;
             }
 
             QComboBox::drop-down {
                 border: none;
-                width: 26px;
+                width: 22px;
             }
 
             QCheckBox {
                 color: rgba(245, 238, 220, 210);
-                spacing: 8px;
-                font-weight: 500;
+                spacing: 7px;
+                font-size: 11px;
+                font-weight: 550;
             }
 
             QCheckBox::indicator {
-                width: 17px;
-                height: 17px;
+                width: 16px;
+                height: 16px;
                 border-radius: 5px;
                 border: 1px solid rgba(255, 255, 255, 55);
                 background-color: rgba(255, 255, 255, 18);
@@ -608,15 +708,16 @@ class control_panel(QWidget):
 
             QPushButton {
                 color: #F8F3E7;
-                background-color: rgba(255, 255, 255, 22);
-                border: 1px solid rgba(255, 255, 255, 34);
+                background-color: rgba(255, 255, 255, 20);
+                border: 1px solid rgba(255, 255, 255, 32);
                 border-radius: 13px;
-                padding: 8px 9px;
-                font-weight: 650;
+                padding: 8px 8px;
+                font-size: 11px;
+                font-weight: 750;
             }
 
             QPushButton:hover {
-                background-color: rgba(255, 255, 255, 34);
+                background-color: rgba(255, 255, 255, 32);
                 border: 1px solid rgba(255, 255, 255, 55);
             }
 
@@ -628,6 +729,8 @@ class control_panel(QWidget):
                 color: #08110F;
                 background-color: #74D7C4;
                 border: 1px solid #9FE8DB;
+                font-size: 12px;
+                padding: 10px 8px;
             }
 
             QPushButton#primaryButton:hover {
@@ -647,16 +750,16 @@ class control_panel(QWidget):
             }
 
             QScrollBar:vertical {
-                width: 10px;
+                width: 8px;
             }
 
             QScrollBar:horizontal {
-                height: 10px;
+                height: 8px;
             }
 
             QScrollBar::handle:vertical, QScrollBar::handle:horizontal {
-                background: rgba(255, 255, 255, 45);
-                border-radius: 5px;
+                background: rgba(255, 255, 255, 42);
+                border-radius: 4px;
                 min-height: 36px;
                 min-width: 36px;
             }
@@ -747,21 +850,109 @@ class control_panel(QWidget):
 
         geometry = screen.availableGeometry()
 
-        panel_width = min(620, max(500, int(geometry.width() * 0.34)))
+        panel_width = min(390, max(330, int(geometry.width() * 0.20)))
         panel_height = geometry.height()
 
         self.resize(panel_width, panel_height)
-        self.setMinimumWidth(420)
+        self.setMinimumWidth(320)
+        self.setMaximumWidth(430)
 
     def _make_spinbox(self, min_value, max_value):
         spin = QSpinBox()
         spin.setRange(min_value, max_value)
         spin.setSingleStep(1)
         spin.setButtonSymbols(QSpinBox.PlusMinus)
-        spin.setMinimumWidth(72)
-        spin.setMaximumWidth(118)
+        spin.setMinimumWidth(64)
+        spin.setMaximumWidth(108)
         spin.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         return spin
+
+    def _make_sidebar_header(self):
+        header = QWidget()
+        header.setObjectName("sidebarHeader")
+
+        layout = QVBoxLayout(header)
+        layout.setContentsMargins(10, 12, 10, 12)
+        layout.setSpacing(6)
+        layout.setAlignment(Qt.AlignCenter)
+
+        icon_label = QLabel()
+        icon_label.setObjectName("appIcon")
+        icon_label.setAlignment(Qt.AlignCenter)
+
+        icon_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "assets",
+            "app-icon",
+            "BirdBros-AppIcon-1024.png"
+        )
+
+        if os.path.exists(icon_path):
+            pixmap = QPixmap(icon_path)
+
+            if not pixmap.isNull():
+                icon_label.setPixmap(
+                    pixmap.scaled(
+                        58,
+                        58,
+                        Qt.KeepAspectRatio,
+                        Qt.SmoothTransformation
+                    )
+                )
+            else:
+                icon_label.setText("🐦")
+        else:
+            icon_label.setText("🐦")
+
+        header_label = QLabel("BirdBros")
+        header_label.setObjectName("appHeader")
+        header_label.setAlignment(Qt.AlignCenter)
+
+        subtitle_label = QLabel("Recycle Co.")
+        subtitle_label.setObjectName("appSubtitle")
+        subtitle_label.setAlignment(Qt.AlignCenter)
+
+        descriptor_label = QLabel("Autonomous behavior reinforcement")
+        descriptor_label.setObjectName("appDescriptor")
+        descriptor_label.setAlignment(Qt.AlignCenter)
+        descriptor_label.setWordWrap(True)
+
+        layout.addWidget(icon_label)
+        layout.addWidget(header_label)
+        layout.addWidget(subtitle_label)
+        layout.addWidget(descriptor_label)
+
+        return header
+
+    def _make_collapsible_section(self, title, body_widget, expanded=False):
+        section = QWidget()
+        section.setObjectName("collapsibleSection")
+
+        layout = QVBoxLayout(section)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        header = QToolButton()
+        header.setObjectName("sectionHeader")
+        header.setText(f"{'▾' if expanded else '▸'}  {title}")
+        header.setCheckable(True)
+        header.setChecked(expanded)
+        header.setToolButtonStyle(Qt.ToolButtonTextOnly)
+        header.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
+        body_widget.setVisible(expanded)
+        body_widget.setObjectName("sectionBody")
+
+        def update_section_visibility(checked):
+            body_widget.setVisible(checked)
+            header.setText(f"{'▾' if checked else '▸'}  {title}")
+
+        header.toggled.connect(update_section_visibility)
+
+        layout.addWidget(header)
+        layout.addWidget(body_widget)
+
+        return section
 
     def _make_reward_row(self, label_text, widget):
         row = QWidget()
