@@ -561,25 +561,24 @@ class control_panel(QWidget):
 
             QLabel#appHeader {
                 color: #F8F3E7;
-                font-size: 19px;
+                font-size: 17px;
                 font-weight: 850;
-                letter-spacing: 0.2px;
+                letter-spacing: 0.1px;
                 background-color: transparent;
             }
 
-            QLabel#appSubtitle {
+            QLabel#appDescriptorPrimary {
                 color: #F1D99B;
-                font-size: 13px;
+                font-size: 11px;
                 font-weight: 800;
-                letter-spacing: 0.2px;
+                letter-spacing: 0.1px;
                 background-color: transparent;
             }
 
             QLabel#appDescriptor {
                 color: rgba(236, 232, 221, 150);
-                font-size: 9px;
-                font-weight: 600;
-                line-height: 95%;
+                font-size: 10px;
+                font-weight: 650;
                 background-color: transparent;
             }
 
@@ -606,22 +605,22 @@ class control_panel(QWidget):
             }
 
             QWidget#sectionHeaderCard:hover {
-                background-color: rgba(255, 255, 255, 22);
-                border: 1px solid rgba(116, 215, 196, 85);
+                background-color: rgba(255, 255, 255, 20);
+                border: 1px solid rgba(180, 180, 172, 72);
             }
 
             QWidget#sectionHeaderCard[expanded="true"] {
-                background-color: rgba(116, 215, 196, 12);
-                border: 1px solid rgba(116, 215, 196, 105);
+                background-color: rgba(255, 255, 255, 16);
+                border: 1px solid rgba(210, 207, 196, 90);
             }
 
             QLabel#sectionIconBadge {
-                color: #74D7C4;
-                background-color: rgba(116, 215, 196, 16);
-                border: 1px solid rgba(116, 215, 196, 95);
-                border-radius: 9px;
-                font-size: 15px;
-                font-weight: 900;
+                color: #C9C6BC;
+                background-color: rgba(255, 255, 255, 10);
+                border: 1px solid rgba(210, 207, 196, 58);
+                border-radius: 10px;
+                font-size: 16px;
+                font-weight: 850;
             }
 
             QLabel#sectionHeaderTitle {
@@ -632,7 +631,7 @@ class control_panel(QWidget):
             }
 
             QLabel#sectionChevron {
-                color: rgba(245, 238, 220, 175);
+                color: rgba(245, 238, 220, 170);
                 background-color: transparent;
                 font-size: 12px;
                 font-weight: 850;
@@ -959,28 +958,29 @@ class control_panel(QWidget):
 
         text_layout = QVBoxLayout(text_stack)
         text_layout.setContentsMargins(0, 0, 0, 0)
-        text_layout.setSpacing(1)
+        text_layout.setSpacing(0)
         text_layout.setAlignment(Qt.AlignVCenter | Qt.AlignRight)
 
-        header_label = QLabel("BirdBros")
+        header_label = QLabel("BirdBros Recycle Co.")
         header_label.setObjectName("appHeader")
         header_label.setAlignment(Qt.AlignRight)
         header_label.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
 
-        subtitle_label = QLabel("Recycle Co.")
-        subtitle_label.setObjectName("appSubtitle")
-        subtitle_label.setAlignment(Qt.AlignRight)
-        subtitle_label.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
+        descriptor_line_one = QLabel("Autonomous Behaviour")
+        descriptor_line_one.setObjectName("appDescriptorPrimary")
+        descriptor_line_one.setAlignment(Qt.AlignRight)
+        descriptor_line_one.setWordWrap(False)
+        descriptor_line_one.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
 
-        descriptor_label = QLabel("Autonomous behavior\nreinforcement")
-        descriptor_label.setObjectName("appDescriptor")
-        descriptor_label.setAlignment(Qt.AlignRight)
-        descriptor_label.setWordWrap(False)
-        descriptor_label.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
+        descriptor_line_two = QLabel("Reinforcement")
+        descriptor_line_two.setObjectName("appDescriptor")
+        descriptor_line_two.setAlignment(Qt.AlignRight)
+        descriptor_line_two.setWordWrap(False)
+        descriptor_line_two.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
 
         text_layout.addWidget(header_label)
-        text_layout.addWidget(subtitle_label)
-        text_layout.addWidget(descriptor_label)
+        text_layout.addWidget(descriptor_line_one)
+        text_layout.addWidget(descriptor_line_two)
 
         layout.addWidget(icon_label, 0, Qt.AlignLeft | Qt.AlignVCenter)
         layout.addStretch(1)
@@ -1000,31 +1000,37 @@ class control_panel(QWidget):
         header.setObjectName("sectionHeaderCard")
         header.setCursor(Qt.PointingHandCursor)
         header.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        header.setMinimumHeight(58)
+        header.setMaximumHeight(58)
 
         header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(12, 8, 12, 8)
+        header_layout.setContentsMargins(12, 0, 12, 0)
         header_layout.setSpacing(10)
-        header_layout.setAlignment(Qt.AlignVCenter)
+        header_layout.setAlignment(Qt.AlignCenter)
 
         icon_label = QLabel(icon_text)
         icon_label.setObjectName("sectionIconBadge")
         icon_label.setAlignment(Qt.AlignCenter)
-        icon_label.setMinimumSize(30, 30)
-        icon_label.setMaximumSize(30, 30)
+        icon_label.setMinimumSize(32, 32)
+        icon_label.setMaximumSize(32, 32)
 
         title_label = QLabel(title)
         title_label.setObjectName("sectionHeaderTitle")
         title_label.setAlignment(Qt.AlignCenter)
         title_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        title_label.setMinimumHeight(32)
+        title_label.setMaximumHeight(32)
 
         chevron_label = QLabel("▾" if expanded else "▸")
         chevron_label.setObjectName("sectionChevron")
         chevron_label.setAlignment(Qt.AlignCenter)
         chevron_label.setMinimumWidth(18)
+        chevron_label.setMinimumHeight(32)
+        chevron_label.setMaximumHeight(32)
 
-        header_layout.addWidget(icon_label, 0, Qt.AlignLeft | Qt.AlignVCenter)
-        header_layout.addWidget(title_label, 1)
-        header_layout.addWidget(chevron_label, 0, Qt.AlignRight | Qt.AlignVCenter)
+        header_layout.addWidget(icon_label, 0, Qt.AlignVCenter | Qt.AlignLeft)
+        header_layout.addWidget(title_label, 1, Qt.AlignVCenter)
+        header_layout.addWidget(chevron_label, 0, Qt.AlignVCenter | Qt.AlignRight)
 
         body_widget.setVisible(expanded)
         body_widget.setObjectName("sectionBody")
