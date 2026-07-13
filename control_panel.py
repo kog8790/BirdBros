@@ -607,20 +607,20 @@ class control_panel(QWidget):
 
             QWidget#sectionHeaderCard:hover {
                 background-color: rgba(255, 255, 255, 22);
-                border: 1px solid rgba(116, 215, 196, 95);
+                border: 1px solid rgba(116, 215, 196, 85);
             }
 
             QWidget#sectionHeaderCard[expanded="true"] {
-                background-color: rgba(116, 215, 196, 18);
-                border: 1px solid rgba(116, 215, 196, 130);
+                background-color: rgba(116, 215, 196, 12);
+                border: 1px solid rgba(116, 215, 196, 105);
             }
 
             QLabel#sectionIconBadge {
-                color: #08110F;
-                background-color: #74D7C4;
-                border: 1px solid rgba(159, 232, 219, 190);
-                border-radius: 7px;
-                font-size: 13px;
+                color: #74D7C4;
+                background-color: rgba(116, 215, 196, 16);
+                border: 1px solid rgba(116, 215, 196, 95);
+                border-radius: 9px;
+                font-size: 15px;
                 font-weight: 900;
             }
 
@@ -628,14 +628,14 @@ class control_panel(QWidget):
                 color: #F5EEDC;
                 background-color: transparent;
                 font-size: 12px;
-                font-weight: 800;
+                font-weight: 850;
             }
 
             QLabel#sectionChevron {
-                color: rgba(245, 238, 220, 180);
+                color: rgba(245, 238, 220, 175);
                 background-color: transparent;
                 font-size: 12px;
-                font-weight: 800;
+                font-weight: 850;
             }
 
             QGroupBox {
@@ -920,8 +920,8 @@ class control_panel(QWidget):
 
         layout = QHBoxLayout(header)
         layout.setContentsMargins(10, 8, 10, 8)
-        layout.setSpacing(10)
-        layout.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
+        layout.setSpacing(0)
+        layout.setAlignment(Qt.AlignVCenter)
 
         icon_label = QLabel()
         icon_label.setObjectName("appIcon")
@@ -960,21 +960,21 @@ class control_panel(QWidget):
         text_layout = QVBoxLayout(text_stack)
         text_layout.setContentsMargins(0, 0, 0, 0)
         text_layout.setSpacing(1)
-        text_layout.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
+        text_layout.setAlignment(Qt.AlignVCenter | Qt.AlignRight)
 
         header_label = QLabel("BirdBros")
         header_label.setObjectName("appHeader")
-        header_label.setAlignment(Qt.AlignLeft)
+        header_label.setAlignment(Qt.AlignRight)
         header_label.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
 
         subtitle_label = QLabel("Recycle Co.")
         subtitle_label.setObjectName("appSubtitle")
-        subtitle_label.setAlignment(Qt.AlignLeft)
+        subtitle_label.setAlignment(Qt.AlignRight)
         subtitle_label.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
 
         descriptor_label = QLabel("Autonomous behavior\nreinforcement")
         descriptor_label.setObjectName("appDescriptor")
-        descriptor_label.setAlignment(Qt.AlignLeft)
+        descriptor_label.setAlignment(Qt.AlignRight)
         descriptor_label.setWordWrap(False)
         descriptor_label.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
 
@@ -983,8 +983,8 @@ class control_panel(QWidget):
         text_layout.addWidget(descriptor_label)
 
         layout.addWidget(icon_label, 0, Qt.AlignLeft | Qt.AlignVCenter)
-        layout.addWidget(text_stack, 0, Qt.AlignLeft | Qt.AlignVCenter)
         layout.addStretch(1)
+        layout.addWidget(text_stack, 0, Qt.AlignRight | Qt.AlignVCenter)
 
         return header
 
@@ -1003,28 +1003,28 @@ class control_panel(QWidget):
 
         header_layout = QHBoxLayout(header)
         header_layout.setContentsMargins(12, 8, 12, 8)
-        header_layout.setSpacing(9)
+        header_layout.setSpacing(10)
         header_layout.setAlignment(Qt.AlignVCenter)
 
         icon_label = QLabel(icon_text)
         icon_label.setObjectName("sectionIconBadge")
         icon_label.setAlignment(Qt.AlignCenter)
-        icon_label.setMinimumSize(26, 26)
-        icon_label.setMaximumSize(26, 26)
+        icon_label.setMinimumSize(30, 30)
+        icon_label.setMaximumSize(30, 30)
 
         title_label = QLabel(title)
         title_label.setObjectName("sectionHeaderTitle")
-        title_label.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
+        title_label.setAlignment(Qt.AlignCenter)
         title_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
         chevron_label = QLabel("▾" if expanded else "▸")
         chevron_label.setObjectName("sectionChevron")
         chevron_label.setAlignment(Qt.AlignCenter)
-        chevron_label.setMinimumWidth(14)
+        chevron_label.setMinimumWidth(18)
 
-        header_layout.addWidget(icon_label)
+        header_layout.addWidget(icon_label, 0, Qt.AlignLeft | Qt.AlignVCenter)
         header_layout.addWidget(title_label, 1)
-        header_layout.addWidget(chevron_label)
+        header_layout.addWidget(chevron_label, 0, Qt.AlignRight | Qt.AlignVCenter)
 
         body_widget.setVisible(expanded)
         body_widget.setObjectName("sectionBody")
