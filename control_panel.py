@@ -741,17 +741,43 @@ class control_panel(QWidget):
             }
 
             QComboBox QAbstractItemView {
-                color: #101214;
-                background-color: #F8F3E7;
+                color: #F8F3E7;
+                background-color: #202426;
                 selection-background-color: #74D7C4;
                 selection-color: #101214;
-                border: 1px solid rgba(0, 0, 0, 45);
+                border: 1px solid rgba(255, 255, 255, 42);
+                border-radius: 8px;
                 outline: none;
+                padding: 4px;
+            }
+
+            QComboBox QAbstractItemView::item {
+                color: #F8F3E7;
+                background-color: #202426;
+                min-height: 26px;
+                padding: 6px 10px;
+                border-radius: 6px;
+            }
+
+            QComboBox QAbstractItemView::item:hover {
+                color: #101214;
+                background-color: #74D7C4;
+            }
+
+            QComboBox QAbstractItemView::item:selected {
+                color: #101214;
+                background-color: #74D7C4;
+            }
+
+            QComboBox QAbstractItemView::item:disabled {
+                color: rgba(248, 243, 231, 95);
+                background-color: #202426;
             }
 
             QComboBox::drop-down {
                 border: none;
                 width: 22px;
+                background-color: transparent;
             }
 
             QCheckBox {
