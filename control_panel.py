@@ -47,6 +47,7 @@ from PySide6.QtWidgets import (
 )
 
 from config_manager import DEFAULT_CONFIG, load_config, save_config
+from draw_regions import RegionDragCaptureDialog
 from macos_permissions import (
     accessibility_trusted,
     request_accessibility_trust,
@@ -413,32 +414,44 @@ class control_panel(QWidget):
         button_grid.setSpacing(8)
 
         self.start_pause_button = QPushButton("Start Detection")
+        self.draw_capture_button = QPushButton("Draw Capture")
+        self.draw_trigger_button = QPushButton("Draw Trigger")
         self.save_button = QPushButton("Save")
         self.reload_button = QPushButton("Reload")
         self.reset_button = QPushButton("Reset")
-        self.manual_capture_button = QPushButton("ROI Capture")
+        self.manual_capture_button = QPushButton("Snapshot")
         self.exit_button = QPushButton("Exit")
 
         for button in [
-            self.start_pause_button, self.save_button, self.reload_button,
-            self.reset_button, self.manual_capture_button, self.exit_button
+            self.start_pause_button,
+            self.draw_capture_button,
+            self.draw_trigger_button,
+            self.save_button,
+            self.reload_button,
+            self.reset_button,
+            self.manual_capture_button,
+            self.exit_button
         ]:
             button.setMinimumWidth(0)
             button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
         self.start_pause_button.setObjectName("primaryButton")
         self.exit_button.setObjectName("dangerButton")
+        self.draw_capture_button.setObjectName("secondaryButton")
+        self.draw_trigger_button.setObjectName("secondaryButton")
         self.save_button.setObjectName("secondaryButton")
         self.reload_button.setObjectName("secondaryButton")
         self.reset_button.setObjectName("secondaryButton")
         self.manual_capture_button.setObjectName("secondaryButton")
 
         button_grid.addWidget(self.start_pause_button, 0, 0, 1, 2)
-        button_grid.addWidget(self.save_button, 1, 0)
-        button_grid.addWidget(self.reload_button, 1, 1)
-        button_grid.addWidget(self.manual_capture_button, 2, 0)
-        button_grid.addWidget(self.reset_button, 2, 1)
-        button_grid.addWidget(self.exit_button, 3, 0, 1, 2)
+        button_grid.addWidget(self.draw_capture_button, 1, 0)
+        button_grid.addWidget(self.draw_trigger_button, 1, 1)
+        button_grid.addWidget(self.save_button, 2, 0)
+        button_grid.addWidget(self.reload_button, 2, 1)
+        button_grid.addWidget(self.manual_capture_button, 3, 0)
+        button_grid.addWidget(self.reset_button, 3, 1)
+        button_grid.addWidget(self.exit_button, 4, 0, 1, 2)
 
         button_grid.setColumnStretch(0, 1)
         button_grid.setColumnStretch(1, 1)
@@ -887,6 +900,8 @@ class control_panel(QWidget):
             widget.textChanged.connect(self._on_widget_changed)
 
         self.start_pause_button.clicked.connect(self._on_start_pause_clicked)
+        self.draw_capture_button.clicked.connect(self._on_draw_capture_region_clicked)
+        self.draw_trigger_button.clicked.connect(self._on_draw_trigger_roi_clicked)
         self.save_button.clicked.connect(self.save_config)
         self.reload_button.clicked.connect(self.reload_config)
         self.reset_button.clicked.connect(self.reset_defaults)
@@ -1433,6 +1448,77 @@ class control_panel(QWidget):
             self.status_label.setText("Detection running")
 
         self.detection_paused_changed.emit(self.detection_paused)
+
+    def _on_draw_capture_region_clicked(self):
+        dialog = RegionDragCaptureDialog(
+            title="Draw Capture Region",
+            instructions=(
+                "Draw the full screen area BirdBros should analyze.\n"
+                "This sets Capture Region: Left, Top, Width, and Height."
+            ),
+            parent=self
+        )
+
+        if dialog.exec() != QDialog.Accepted or dialog.selected_rect is None:
+            return
+
+        x, y, width, height = dialog.selected_rect
+
+        self.capture_left.setValue(max(0, x))
+        self.capture_top.setValue(max(0, y))
+        self.capture_width.setValue(max(1, width))
+        self.capture_height.setValue(max(1, height))
+
+        self.status_label.setText("Capture region updated")
+        self._on_widget_changed()
+
+    def _on_draw_trigger_roi_clicked(self):
+        capture_left = self.capture_left.value()
+        capture_top = self.capture_top.value()
+        capture_width = self.capture_width.value()
+        capture_height = self.capture_height.value()
+
+        if capture_width <= 0 or capture_height <= 0:
+            QMessageBox.warning(
+                self,
+                "Capture Region Required",
+                "Set a valid Capture Region before drawing the Trigger ROI."
+            )
+            return
+
+        dialog = RegionDragCaptureDialog(
+            title="Draw Trigger ROI",
+            instructions=(
+                "Draw the trigger/drop zone inside the current Capture Region.\n"
+                "This sets Trigger ROI: X, Y, W, and H relative to the Capture Region."
+            ),
+            parent=self
+        )
+
+        if dialog.exec() != QDialog.Accepted or dialog.selected_rect is None:
+            return
+
+        screen_x, screen_y, screen_w, screen_h = dialog.selected_rect
+
+        relative_x = screen_x - capture_left
+        relative_y = screen_y - capture_top
+
+        clamped_x = max(0, min(relative_x, capture_width - 1))
+        clamped_y = max(0, min(relative_y, capture_height - 1))
+
+        max_w = max(1, capture_width - clamped_x)
+        max_h = max(1, capture_height - clamped_y)
+
+        clamped_w = max(1, min(screen_w, max_w))
+        clamped_h = max(1, min(screen_h, max_h))
+
+        self.object_x.setValue(int(clamped_x))
+        self.object_y.setValue(int(clamped_y))
+        self.object_w.setValue(int(clamped_w))
+        self.object_h.setValue(int(clamped_h))
+
+        self.status_label.setText("Trigger ROI updated")
+        self._on_widget_changed()
 
     def _on_exit_clicked(self):
         self.exit_requested.emit()
