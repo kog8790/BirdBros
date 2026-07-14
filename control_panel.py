@@ -23,7 +23,7 @@ except ImportError:
     pyautogui = None
 
 from PySide6.QtCore import Qt, Signal, QTimer
-from PySide6.QtGui import QPixmap
+from PySide6.QtGui import QCursor, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QWidget,
@@ -42,6 +42,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QScrollArea,
     QSizePolicy,
+    QStyle,
     QToolButton
 )
 
@@ -269,10 +270,15 @@ class control_panel(QWidget):
 
         display_layout.addWidget(self.show_overlay, 0, 0)
         display_layout.addWidget(self.show_grid, 0, 1)
-        display_layout.addWidget(self.show_coords, 0, 2)
 
         display_layout.addWidget(self.show_capture_border, 1, 0)
         display_layout.addWidget(self.show_labels, 1, 1)
+
+        display_layout.addWidget(self.show_coords, 2, 0, 1, 2)
+
+        display_layout.setColumnStretch(0, 1)
+        display_layout.setColumnStretch(1, 1)
+
         display_group.setLayout(display_layout)
 
         task_group = QGroupBox("AI Task Labels")
@@ -280,8 +286,12 @@ class control_panel(QWidget):
 
         self.behavior_mode = QComboBox()
         self.behavior_mode.addItems(["simple", "advanced"])
+        self.behavior_mode.setEditable(True)
+        self.behavior_mode.lineEdit().setReadOnly(True)
+        self.behavior_mode.lineEdit().setAlignment(Qt.AlignCenter)
 
         self.reward_description = QLineEdit()
+        self.reward_description.setCursorPosition(0)
         self.reward_description.setPlaceholderText(
             "A bird drops litter into a receptacle."
         )
@@ -459,7 +469,7 @@ class control_panel(QWidget):
                 "Display Options",
                 display_group,
                 expanded=False,
-                icon_text="◉"
+                icon_text="EYE"
             )
         )
 
@@ -468,7 +478,7 @@ class control_panel(QWidget):
                 "Capture Region",
                 capture_group,
                 expanded=False,
-                icon_text="▣"
+                icon_text="CAP"
             )
         )
 
@@ -477,7 +487,7 @@ class control_panel(QWidget):
                 "Video Input",
                 video_group,
                 expanded=False,
-                icon_text="▰"
+                icon_text="VID"
             )
         )
 
@@ -486,7 +496,7 @@ class control_panel(QWidget):
                 "Trigger ROI",
                 self.object_group,
                 expanded=False,
-                icon_text="⌖"
+                icon_text="ROI"
             )
         )
 
@@ -495,7 +505,7 @@ class control_panel(QWidget):
                 "Subject ROI",
                 self.subject_group,
                 expanded=False,
-                icon_text="◇"
+                icon_text="SUB"
             )
         )
 
@@ -504,7 +514,7 @@ class control_panel(QWidget):
                 "Motion",
                 motion_group,
                 expanded=False,
-                icon_text="⌁"
+                icon_text="MTN"
             )
         )
 
@@ -561,17 +571,23 @@ class control_panel(QWidget):
 
             QLabel#appHeader {
                 color: #F8F3E7;
-                font-size: 17px;
+                font-size: 16px;
                 font-weight: 850;
-                letter-spacing: 0.1px;
+                letter-spacing: 0.05px;
                 background-color: transparent;
+            }
+
+            QLabel#headerSpacer {
+                color: transparent;
+                background-color: transparent;
+                font-size: 1px;
             }
 
             QLabel#appDescriptorPrimary {
                 color: #F1D99B;
                 font-size: 11px;
                 font-weight: 800;
-                letter-spacing: 0.1px;
+                letter-spacing: 0.05px;
                 background-color: transparent;
             }
 
@@ -601,7 +617,6 @@ class control_panel(QWidget):
                 background-color: rgba(255, 255, 255, 13);
                 border: 1px solid rgba(255, 255, 255, 24);
                 border-radius: 14px;
-                margin-top: 8px;
             }
 
             QWidget#sectionHeaderCard:hover {
@@ -614,24 +629,18 @@ class control_panel(QWidget):
                 border: 1px solid rgba(210, 207, 196, 90);
             }
 
-            QLabel#sectionIconBadge {
-                color: #C9C6BC;
-                background-color: rgba(255, 255, 255, 10);
-                border: 1px solid rgba(210, 207, 196, 58);
-                border-radius: 10px;
-                font-size: 16px;
+            QLabel#sectionSideIcon {
+                color: rgba(245, 238, 220, 190);
+                background-color: rgba(255, 255, 255, 8);
+                border: 1px solid rgba(210, 207, 196, 46);
+                border-radius: 9px;
+                font-size: 8px;
                 font-weight: 850;
+                letter-spacing: 0.6px;
             }
 
             QLabel#sectionHeaderTitle {
                 color: #F5EEDC;
-                background-color: transparent;
-                font-size: 12px;
-                font-weight: 850;
-            }
-
-            QLabel#sectionChevron {
-                color: rgba(245, 238, 220, 170);
                 background-color: transparent;
                 font-size: 12px;
                 font-weight: 850;
@@ -889,7 +898,7 @@ class control_panel(QWidget):
     # ================================
 
     def _apply_responsive_window_size(self):
-        screen = QApplication.primaryScreen()
+        screen = QApplication.screenAt(QCursor.pos()) or QApplication.primaryScreen()
 
         if not screen:
             return
@@ -903,6 +912,10 @@ class control_panel(QWidget):
         self.setMinimumWidth(310)
         self.setMaximumWidth(380)
 
+        self._pin_to_screen_right_edge()
+        QTimer.singleShot(0, self._pin_to_screen_right_edge)
+        QTimer.singleShot(100, self._pin_to_screen_right_edge)
+
     def _make_spinbox(self, min_value, max_value):
         spin = QSpinBox()
         spin.setRange(min_value, max_value)
@@ -912,6 +925,35 @@ class control_panel(QWidget):
         spin.setMaximumWidth(108)
         spin.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         return spin
+
+    def _pin_to_screen_right_edge(self):
+        screen = self.screen() or QApplication.screenAt(QCursor.pos()) or QApplication.primaryScreen()
+
+        if not screen:
+            return
+
+        geometry = screen.availableGeometry()
+        frame = self.frameGeometry()
+
+        frame_width = frame.width() if frame.width() > 0 else self.width()
+        frame_height = frame.height() if frame.height() > 0 else self.height()
+
+        target_frame_x = geometry.x() + geometry.width() - frame_width
+        target_frame_y = geometry.y()
+
+        frame_offset_x = self.pos().x() - frame.x()
+        frame_offset_y = self.pos().y() - frame.y()
+
+        self.move(
+            target_frame_x + frame_offset_x,
+            target_frame_y + frame_offset_y
+        )
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        QTimer.singleShot(0, self._pin_to_screen_right_edge)
+        QTimer.singleShot(100, self._pin_to_screen_right_edge)
+        QTimer.singleShot(300, self._pin_to_screen_right_edge)
 
     def _make_sidebar_header(self):
         header = QWidget()
@@ -954,31 +996,39 @@ class control_panel(QWidget):
 
         text_stack = QWidget()
         text_stack.setObjectName("headerTextStack")
-        text_stack.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
+        text_stack.setMinimumWidth(210)
+        text_stack.setMaximumWidth(250)
+        text_stack.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
 
         text_layout = QVBoxLayout(text_stack)
         text_layout.setContentsMargins(0, 0, 0, 0)
         text_layout.setSpacing(0)
-        text_layout.setAlignment(Qt.AlignVCenter | Qt.AlignRight)
+        text_layout.setAlignment(Qt.AlignVCenter | Qt.AlignCenter)
 
         header_label = QLabel("BirdBros Recycle Co.")
         header_label.setObjectName("appHeader")
-        header_label.setAlignment(Qt.AlignRight)
-        header_label.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
+        header_label.setAlignment(Qt.AlignCenter)
+        header_label.setWordWrap(False)
+        header_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
         descriptor_line_one = QLabel("Autonomous Behaviour")
         descriptor_line_one.setObjectName("appDescriptorPrimary")
-        descriptor_line_one.setAlignment(Qt.AlignRight)
+        descriptor_line_one.setAlignment(Qt.AlignCenter)
         descriptor_line_one.setWordWrap(False)
-        descriptor_line_one.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
+        descriptor_line_one.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
         descriptor_line_two = QLabel("Reinforcement")
         descriptor_line_two.setObjectName("appDescriptor")
-        descriptor_line_two.setAlignment(Qt.AlignRight)
+        descriptor_line_two.setAlignment(Qt.AlignCenter)
         descriptor_line_two.setWordWrap(False)
-        descriptor_line_two.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
+        descriptor_line_two.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
+        header_spacer = QLabel("")
+        header_spacer.setObjectName("headerSpacer")
+        header_spacer.setFixedHeight(4)
 
         text_layout.addWidget(header_label)
+        text_layout.addWidget(header_spacer)
         text_layout.addWidget(descriptor_line_one)
         text_layout.addWidget(descriptor_line_two)
 
@@ -1000,47 +1050,40 @@ class control_panel(QWidget):
         header.setObjectName("sectionHeaderCard")
         header.setCursor(Qt.PointingHandCursor)
         header.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        header.setMinimumHeight(58)
-        header.setMaximumHeight(58)
+        header.setFixedHeight(58)
 
         header_layout = QHBoxLayout(header)
         header_layout.setContentsMargins(12, 0, 12, 0)
         header_layout.setSpacing(10)
-        header_layout.setAlignment(Qt.AlignCenter)
+        header_layout.setAlignment(Qt.AlignVCenter)
 
-        icon_label = QLabel(icon_text)
-        icon_label.setObjectName("sectionIconBadge")
-        icon_label.setAlignment(Qt.AlignCenter)
-        icon_label.setMinimumSize(32, 32)
-        icon_label.setMaximumSize(32, 32)
+        left_icon = QLabel(icon_text)
+        left_icon.setObjectName("sectionSideIcon")
+        left_icon.setAlignment(Qt.AlignCenter)
+        left_icon.setFixedSize(42, 32)
 
         title_label = QLabel(title)
         title_label.setObjectName("sectionHeaderTitle")
         title_label.setAlignment(Qt.AlignCenter)
         title_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        title_label.setMinimumHeight(32)
-        title_label.setMaximumHeight(32)
+        title_label.setFixedHeight(34)
 
-        chevron_label = QLabel("▾" if expanded else "▸")
-        chevron_label.setObjectName("sectionChevron")
-        chevron_label.setAlignment(Qt.AlignCenter)
-        chevron_label.setMinimumWidth(18)
-        chevron_label.setMinimumHeight(32)
-        chevron_label.setMaximumHeight(32)
-
-        header_layout.addWidget(icon_label, 0, Qt.AlignVCenter | Qt.AlignLeft)
-        header_layout.addWidget(title_label, 1, Qt.AlignVCenter)
-        header_layout.addWidget(chevron_label, 0, Qt.AlignVCenter | Qt.AlignRight)
+        right_icon = QLabel("OPEN" if expanded else "MORE")
+        right_icon.setObjectName("sectionSideIcon")
+        right_icon.setAlignment(Qt.AlignCenter)
+        right_icon.setFixedSize(42, 32)
 
         body_widget.setVisible(expanded)
         body_widget.setObjectName("sectionBody")
+        body_widget.setMinimumWidth(0)
+        body_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Maximum)
 
         expanded_state = {"value": expanded}
 
         def update_section_visibility(checked):
             expanded_state["value"] = checked
             body_widget.setVisible(checked)
-            chevron_label.setText("▾" if checked else "▸")
+            right_icon.setText("OPEN" if checked else "MORE")
             header.setProperty("expanded", checked)
             header.style().unpolish(header)
             header.style().polish(header)
@@ -1048,6 +1091,10 @@ class control_panel(QWidget):
         def toggle_section(event):
             update_section_visibility(not expanded_state["value"])
             event.accept()
+
+        header_layout.addWidget(left_icon, 0, Qt.AlignLeft | Qt.AlignVCenter)
+        header_layout.addWidget(title_label, 1, Qt.AlignCenter)
+        header_layout.addWidget(right_icon, 0, Qt.AlignRight | Qt.AlignVCenter)
 
         header.mousePressEvent = toggle_section
         update_section_visibility(expanded)
@@ -1624,6 +1671,7 @@ class control_panel(QWidget):
         self.reward_description.setText(
             cfg.get("reward_description", "")
         )
+        self.reward_description.setCursorPosition(0)
 
         self._on_behavior_mode_changed()
 
