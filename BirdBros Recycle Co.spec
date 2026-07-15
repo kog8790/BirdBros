@@ -39,6 +39,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon='assets/BirdBros.icns',
 )
 coll = COLLECT(
     exe,
@@ -52,6 +53,6 @@ coll = COLLECT(
 app = BUNDLE(
     coll,
     name='BirdBros Recycle Co.app',
-    icon=None,
+    icon='assets/BirdBros.icns',
     bundle_identifier='co.birdbros.recycleco',
 )
