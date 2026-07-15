@@ -47,6 +47,7 @@ from PySide6.QtWidgets import (
 )
 
 from config_manager import DEFAULT_CONFIG, load_config, save_config
+from control_panel_ui import control_panel_ui
 from draw_regions import RegionDragCaptureDialog
 from macos_permissions import (
     accessibility_trusted,
@@ -147,7 +148,7 @@ class MousePositionCaptureDialog(QDialog):
 
         super().keyPressEvent(event)
         
-class control_panel(QWidget):
+class control_panel(QWidget, control_panel_ui):
     config_changed = Signal(dict)
     exit_requested = Signal()
     manual_capture_requested = Signal()
@@ -286,10 +287,11 @@ class control_panel(QWidget):
         task_form = QFormLayout()
 
         self.behavior_mode = QComboBox()
+        self.behavior_mode.setObjectName("behaviorModeCombo")
         self.behavior_mode.addItems(["simple", "advanced"])
-        self.behavior_mode.setEditable(True)
-        self.behavior_mode.lineEdit().setReadOnly(True)
-        self.behavior_mode.lineEdit().setAlignment(Qt.AlignCenter)
+        self.behavior_mode.setMinimumWidth(210)
+        self.behavior_mode.setMaximumWidth(210)
+        self.behavior_mode.view().setMinimumWidth(210)
 
         self.reward_description = QLineEdit()
         self.reward_description.setCursorPosition(0)
@@ -312,7 +314,36 @@ class control_panel(QWidget):
         self.target_zone_label_widget = QLabel("Target Zone")
         self.action_label_widget = QLabel("Action")
 
-        task_form.addRow("Behavior Mode", self.behavior_mode)
+        behavior_mode_row = QWidget()
+        behavior_mode_layout = QGridLayout(behavior_mode_row)
+        behavior_mode_layout.setContentsMargins(0, 0, 0, 0)
+        behavior_mode_layout.setHorizontalSpacing(0)
+        behavior_mode_layout.setVerticalSpacing(8)
+
+        behavior_mode_label = QLabel("Behavior Mode")
+        behavior_mode_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+
+        behavior_mode_layout.addWidget(
+            behavior_mode_label,
+            0,
+            0,
+            1,
+            3,
+            Qt.AlignLeft | Qt.AlignVCenter
+        )
+
+        behavior_mode_layout.addWidget(
+            self.behavior_mode,
+            1,
+            1,
+            Qt.AlignCenter
+        )
+
+        behavior_mode_layout.setColumnStretch(0, 1)
+        behavior_mode_layout.setColumnStretch(1, 0)
+        behavior_mode_layout.setColumnStretch(2, 1)
+
+        task_form.addRow(behavior_mode_row)
 
         reward_when_label = QLabel("Reward When")
         reward_when_label.setAlignment(Qt.AlignLeft)
@@ -551,324 +582,7 @@ class control_panel(QWidget):
         outer_layout.setSpacing(8)
         outer_layout.addWidget(scroll)
 
-        self.setLayout(outer_layout)
-
-
-    def _apply_visual_style(self):
-        self.setStyleSheet(
-            """
-            QWidget#birdbros_control_panel {
-                background-color: #101214;
-                color: #ECE8DD;
-                font-family: "SF Pro Display", "Helvetica Neue", Arial;
-                font-size: 12px;
-            }
-
-            QWidget#sidebarHeader {
-                background-color: rgba(255, 255, 255, 12);
-                border: 1px solid rgba(255, 255, 255, 24);
-                border-radius: 18px;
-                min-height: 88px;
-                max-height: 96px;
-            }
-
-            QWidget#headerTextStack {
-                background-color: transparent;
-            }
-
-            QLabel#appIcon {
-                color: #F8F3E7;
-                font-size: 30px;
-                background-color: transparent;
-            }
-
-            QLabel#appHeader {
-                color: #F8F3E7;
-                font-size: 16px;
-                font-weight: 850;
-                letter-spacing: 0.05px;
-                background-color: transparent;
-            }
-
-            QLabel#headerSpacer {
-                color: transparent;
-                background-color: transparent;
-                font-size: 1px;
-            }
-
-            QLabel#appDescriptorPrimary {
-                color: #F1D99B;
-                font-size: 11px;
-                font-weight: 800;
-                letter-spacing: 0.05px;
-                background-color: transparent;
-            }
-
-            QLabel#appDescriptor {
-                color: rgba(236, 232, 221, 150);
-                font-size: 10px;
-                font-weight: 650;
-                background-color: transparent;
-            }
-
-            QScrollArea {
-                border: none;
-                background: transparent;
-            }
-
-            QScrollArea > QWidget > QWidget {
-                background: transparent;
-            }
-
-            QWidget#collapsibleSection {
-                background-color: transparent;
-                margin: 0px;
-                padding: 0px;
-            }
-
-            QWidget#sectionHeaderCard {
-                background-color: rgba(255, 255, 255, 13);
-                border: 1px solid rgba(255, 255, 255, 24);
-                border-radius: 14px;
-            }
-
-            QWidget#sectionHeaderCard:hover {
-                background-color: rgba(255, 255, 255, 20);
-                border: 1px solid rgba(180, 180, 172, 72);
-            }
-
-            QWidget#sectionHeaderCard[expanded="true"] {
-                background-color: rgba(255, 255, 255, 16);
-                border: 1px solid rgba(210, 207, 196, 90);
-            }
-
-            QLabel#sectionSideIcon {
-                color: rgba(245, 238, 220, 190);
-                background-color: rgba(255, 255, 255, 8);
-                border: 1px solid rgba(210, 207, 196, 46);
-                border-radius: 9px;
-                font-size: 8px;
-                font-weight: 850;
-                letter-spacing: 0.6px;
-            }
-
-            QLabel#sectionHeaderTitle {
-                color: #F5EEDC;
-                background-color: transparent;
-                font-size: 12px;
-                font-weight: 850;
-            }
-
-            QGroupBox {
-                background-color: rgba(255, 255, 255, 14);
-                border: 1px solid rgba(255, 255, 255, 25);
-                border-radius: 16px;
-                margin-top: 8px;
-                padding: 10px 8px 8px 8px;
-                color: #F5EEDC;
-                font-size: 12px;
-                font-weight: 700;
-            }
-
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                subcontrol-position: top left;
-                left: 12px;
-                top: 1px;
-                padding: 0 8px;
-                color: #F1D99B;
-                background-color: #101214;
-                border-radius: 8px;
-            }
-
-            QGroupBox#capturePositionCard {
-                background-color: #171B1D;
-                border: 1px solid rgba(116, 215, 196, 150);
-                border-radius: 18px;
-                color: #F8F3E7;
-            }
-
-            QGroupBox#capturePositionCard::title {
-                color: #F1D99B;
-                background-color: #171B1D;
-            }
-
-            QLabel {
-                color: #ECE8DD;
-            }
-
-            QLabel#fieldLabel {
-                color: rgba(236, 232, 221, 165);
-                font-size: 11px;
-                font-weight: 650;
-            }
-
-            QLabel#clickSequenceTitle {
-                color: #F5EEDC;
-                font-size: 12px;
-                font-weight: 800;
-            }
-
-            QWidget#clickSequenceStep {
-                background-color: rgba(255, 255, 255, 10);
-                border: 1px solid rgba(255, 255, 255, 22);
-                border-radius: 12px;
-            }
-
-            QLabel#footerStatus {
-                color: rgba(245, 238, 220, 180);
-                background-color: rgba(255, 255, 255, 12);
-                border: 1px solid rgba(255, 255, 255, 22);
-                border-radius: 12px;
-                padding: 9px;
-                font-size: 11px;
-                font-weight: 650;
-            }
-
-            QLineEdit, QSpinBox, QComboBox {
-                color: #F8F3E7;
-                background-color: rgba(255, 255, 255, 22);
-                border: 1px solid rgba(255, 255, 255, 34);
-                border-radius: 10px;
-                padding: 6px 7px;
-                selection-background-color: #74D7C4;
-                selection-color: #101214;
-            }
-
-            QLineEdit:focus, QSpinBox:focus, QComboBox:focus {
-                border: 1px solid #74D7C4;
-                background-color: rgba(255, 255, 255, 31);
-            }
-
-            QComboBox QAbstractItemView {
-                color: #F8F3E7;
-                background-color: #202426;
-                selection-background-color: #74D7C4;
-                selection-color: #101214;
-                border: 1px solid rgba(255, 255, 255, 42);
-                border-radius: 8px;
-                outline: none;
-                padding: 4px;
-            }
-
-            QComboBox QAbstractItemView::item {
-                color: #F8F3E7;
-                background-color: #202426;
-                min-height: 26px;
-                padding: 6px 10px;
-                border-radius: 6px;
-            }
-
-            QComboBox QAbstractItemView::item:hover {
-                color: #101214;
-                background-color: #74D7C4;
-            }
-
-            QComboBox QAbstractItemView::item:selected {
-                color: #101214;
-                background-color: #74D7C4;
-            }
-
-            QComboBox QAbstractItemView::item:disabled {
-                color: rgba(248, 243, 231, 95);
-                background-color: #202426;
-            }
-
-            QComboBox::drop-down {
-                border: none;
-                width: 22px;
-                background-color: transparent;
-            }
-
-            QCheckBox {
-                color: rgba(245, 238, 220, 210);
-                spacing: 7px;
-                font-size: 11px;
-                font-weight: 550;
-            }
-
-            QCheckBox::indicator {
-                width: 16px;
-                height: 16px;
-                border-radius: 5px;
-                border: 1px solid rgba(255, 255, 255, 55);
-                background-color: rgba(255, 255, 255, 18);
-            }
-
-            QCheckBox::indicator:checked {
-                background-color: #74D7C4;
-                border: 1px solid #74D7C4;
-            }
-
-            QPushButton {
-                color: #F8F3E7;
-                background-color: rgba(255, 255, 255, 20);
-                border: 1px solid rgba(255, 255, 255, 32);
-                border-radius: 13px;
-                padding: 8px 8px;
-                font-size: 11px;
-                font-weight: 750;
-            }
-
-            QPushButton:hover {
-                background-color: rgba(255, 255, 255, 32);
-                border: 1px solid rgba(255, 255, 255, 55);
-            }
-
-            QPushButton:pressed {
-                background-color: rgba(255, 255, 255, 16);
-            }
-
-            QPushButton#primaryButton {
-                color: #08110F;
-                background-color: #74D7C4;
-                border: 1px solid #9FE8DB;
-                font-size: 12px;
-                padding: 10px 8px;
-            }
-
-            QPushButton#primaryButton:hover {
-                background-color: #91E4D5;
-            }
-
-            QPushButton#dangerButton {
-                color: #FFEDEA;
-                background-color: rgba(255, 111, 94, 95);
-                border: 1px solid rgba(255, 145, 128, 130);
-            }
-
-            QScrollBar:vertical, QScrollBar:horizontal {
-                background: transparent;
-                border: none;
-                margin: 0px;
-            }
-
-            QScrollBar:vertical {
-                width: 8px;
-            }
-
-            QScrollBar:horizontal {
-                height: 8px;
-            }
-
-            QScrollBar::handle:vertical, QScrollBar::handle:horizontal {
-                background: rgba(255, 255, 255, 42);
-                border-radius: 4px;
-                min-height: 36px;
-                min-width: 36px;
-            }
-
-            QScrollBar::handle:vertical:hover, QScrollBar::handle:horizontal:hover {
-                background: rgba(255, 255, 255, 75);
-            }
-
-            QScrollBar::add-line, QScrollBar::sub-line,
-            QScrollBar::add-page, QScrollBar::sub-page {
-                background: transparent;
-                border: none;
-            }
-            """
-        )
+        self.setLayout(outer_layout)    
 
     # ================================
     # SIGNAL WIRING
@@ -957,16 +671,6 @@ class control_panel(QWidget):
         QTimer.singleShot(0, self._pin_to_screen_right_edge)
         QTimer.singleShot(100, self._pin_to_screen_right_edge)
 
-    def _make_spinbox(self, min_value, max_value):
-        spin = QSpinBox()
-        spin.setRange(min_value, max_value)
-        spin.setSingleStep(1)
-        spin.setButtonSymbols(QSpinBox.PlusMinus)
-        spin.setMinimumWidth(64)
-        spin.setMaximumWidth(108)
-        spin.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        return spin
-
     def _pin_to_screen_right_edge(self):
         screen = self.screen() or QApplication.screenAt(QCursor.pos()) or QApplication.primaryScreen()
 
@@ -995,155 +699,6 @@ class control_panel(QWidget):
         QTimer.singleShot(0, self._pin_to_screen_right_edge)
         QTimer.singleShot(100, self._pin_to_screen_right_edge)
         QTimer.singleShot(300, self._pin_to_screen_right_edge)
-
-    def _make_sidebar_header(self):
-        header = QWidget()
-        header.setObjectName("sidebarHeader")
-
-        layout = QHBoxLayout(header)
-        layout.setContentsMargins(10, 8, 10, 8)
-        layout.setSpacing(0)
-        layout.setAlignment(Qt.AlignVCenter)
-
-        icon_label = QLabel()
-        icon_label.setObjectName("appIcon")
-        icon_label.setAlignment(Qt.AlignCenter)
-        icon_label.setMinimumSize(72, 72)
-        icon_label.setMaximumSize(72, 72)
-
-        icon_path = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)),
-            "assets",
-            "app-icon",
-            "BirdBros-AppIcon-1024.png"
-        )
-
-        if os.path.exists(icon_path):
-            pixmap = QPixmap(icon_path)
-
-            if not pixmap.isNull():
-                icon_label.setPixmap(
-                    pixmap.scaled(
-                        72,
-                        72,
-                        Qt.KeepAspectRatio,
-                        Qt.SmoothTransformation
-                    )
-                )
-            else:
-                icon_label.setText("🐦")
-        else:
-            icon_label.setText("🐦")
-
-        text_stack = QWidget()
-        text_stack.setObjectName("headerTextStack")
-        text_stack.setMinimumWidth(210)
-        text_stack.setMaximumWidth(250)
-        text_stack.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-
-        text_layout = QVBoxLayout(text_stack)
-        text_layout.setContentsMargins(0, 0, 0, 0)
-        text_layout.setSpacing(0)
-        text_layout.setAlignment(Qt.AlignVCenter | Qt.AlignCenter)
-
-        header_label = QLabel("BirdBros Recycle Co.")
-        header_label.setObjectName("appHeader")
-        header_label.setAlignment(Qt.AlignCenter)
-        header_label.setWordWrap(False)
-        header_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-
-        descriptor_line_one = QLabel("Autonomous Behaviour")
-        descriptor_line_one.setObjectName("appDescriptorPrimary")
-        descriptor_line_one.setAlignment(Qt.AlignCenter)
-        descriptor_line_one.setWordWrap(False)
-        descriptor_line_one.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-
-        descriptor_line_two = QLabel("Reinforcement")
-        descriptor_line_two.setObjectName("appDescriptor")
-        descriptor_line_two.setAlignment(Qt.AlignCenter)
-        descriptor_line_two.setWordWrap(False)
-        descriptor_line_two.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-
-        header_spacer = QLabel("")
-        header_spacer.setObjectName("headerSpacer")
-        header_spacer.setFixedHeight(4)
-
-        text_layout.addWidget(header_label)
-        text_layout.addWidget(header_spacer)
-        text_layout.addWidget(descriptor_line_one)
-        text_layout.addWidget(descriptor_line_two)
-
-        layout.addWidget(icon_label, 0, Qt.AlignLeft | Qt.AlignVCenter)
-        layout.addStretch(1)
-        layout.addWidget(text_stack, 0, Qt.AlignRight | Qt.AlignVCenter)
-
-        return header
-
-    def _make_collapsible_section(self, title, body_widget, expanded=False, icon_text="•"):
-        section = QWidget()
-        section.setObjectName("collapsibleSection")
-
-        layout = QVBoxLayout(section)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
-
-        header = QWidget()
-        header.setObjectName("sectionHeaderCard")
-        header.setCursor(Qt.PointingHandCursor)
-        header.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        header.setFixedHeight(58)
-
-        header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(12, 0, 12, 0)
-        header_layout.setSpacing(10)
-        header_layout.setAlignment(Qt.AlignVCenter)
-
-        left_icon = QLabel(icon_text)
-        left_icon.setObjectName("sectionSideIcon")
-        left_icon.setAlignment(Qt.AlignCenter)
-        left_icon.setFixedSize(42, 32)
-
-        title_label = QLabel(title)
-        title_label.setObjectName("sectionHeaderTitle")
-        title_label.setAlignment(Qt.AlignCenter)
-        title_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        title_label.setFixedHeight(34)
-
-        right_icon = QLabel("OPEN" if expanded else "MORE")
-        right_icon.setObjectName("sectionSideIcon")
-        right_icon.setAlignment(Qt.AlignCenter)
-        right_icon.setFixedSize(42, 32)
-
-        body_widget.setVisible(expanded)
-        body_widget.setObjectName("sectionBody")
-        body_widget.setMinimumWidth(0)
-        body_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Maximum)
-
-        expanded_state = {"value": expanded}
-
-        def update_section_visibility(checked):
-            expanded_state["value"] = checked
-            body_widget.setVisible(checked)
-            right_icon.setText("OPEN" if checked else "MORE")
-            header.setProperty("expanded", checked)
-            header.style().unpolish(header)
-            header.style().polish(header)
-
-        def toggle_section(event):
-            update_section_visibility(not expanded_state["value"])
-            event.accept()
-
-        header_layout.addWidget(left_icon, 0, Qt.AlignLeft | Qt.AlignVCenter)
-        header_layout.addWidget(title_label, 1, Qt.AlignCenter)
-        header_layout.addWidget(right_icon, 0, Qt.AlignRight | Qt.AlignVCenter)
-
-        header.mousePressEvent = toggle_section
-        update_section_visibility(expanded)
-
-        layout.addWidget(header)
-        layout.addWidget(body_widget)
-
-        return section
 
     def _make_reward_row(self, label_text, widget):
         row = QWidget()
