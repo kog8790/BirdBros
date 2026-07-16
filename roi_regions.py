@@ -218,6 +218,34 @@ class ROI:
             roles={"trigger", "object"},
         )
 
+    @classmethod
+    def subject_from_percent_config(
+        cls,
+        config: dict,
+        capture_region: CaptureRegion,
+    ) -> "ROI":
+        return cls.from_percent_config(
+            key="subject_roi",
+            label="Subject ROI",
+            config=config,
+            capture_region=capture_region,
+            roles={"subject"},
+        )
+
+    @classmethod
+    def trigger_object_from_percent_config(
+        cls,
+        config: dict,
+        capture_region: CaptureRegion,
+    ) -> "ROI":
+        return cls.from_percent_config(
+            key="object_roi",
+            label="Trigger ROI",
+            config=config,
+            capture_region=capture_region,
+            roles={"trigger", "object"},
+        )
+
 
 class ROICollection:
     def __init__(self, rois=None):

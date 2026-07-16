@@ -1291,20 +1291,14 @@ class control_panel(QWidget, control_panel_ui):
         self.video_loop.setChecked(video_cfg.get("loop_video", True))
         self.video_fps.setValue(video_cfg.get("fps", 30))
 
-        subject_roi = ROI.from_percent_config(
-            key="subject_roi",
-            label="Subject ROI",
+        subject_roi = ROI.subject_from_percent_config(
             config=cfg,
             capture_region=capture_region,
-            roles={"subject"},
         )
 
-        object_roi = ROI.from_percent_config(
-            key="object_roi",
-            label="Trigger ROI",
+        object_roi = ROI.trigger_object_from_percent_config(
             config=cfg,
             capture_region=capture_region,
-            roles={"trigger", "object"},
         )
 
         self._apply_subject_roi_to_fields(subject_roi)
