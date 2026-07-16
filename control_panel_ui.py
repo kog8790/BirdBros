@@ -496,3 +496,21 @@ class control_panel_ui:
         spin.setMaximumWidth(108)
         spin.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         return spin
+
+    def _apply_capture_region_to_fields(self, capture_region):
+        self.capture_left.setValue(capture_region.left)
+        self.capture_top.setValue(capture_region.top)
+        self.capture_width.setValue(capture_region.width)
+        self.capture_height.setValue(capture_region.height)
+
+    def _apply_subject_roi_to_fields(self, roi):
+        self.subject_x.setValue(roi.x)
+        self.subject_y.setValue(roi.y)
+        self.subject_w.setValue(roi.width)
+        self.subject_h.setValue(roi.height)
+
+    def _apply_object_roi_to_fields(self, roi):
+        self.object_x.setValue(roi.x)
+        self.object_y.setValue(roi.y)
+        self.object_w.setValue(roi.width)
+        self.object_h.setValue(roi.height)

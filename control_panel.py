@@ -1055,56 +1055,9 @@ class control_panel(QWidget, control_panel_ui):
 
         capture_region = CaptureRegion.from_screen_tuple(dialog.selected_rect)
 
-        self.capture_left.setValue(capture_region.left)
-        self.capture_top.setValue(capture_region.top)
-        self.capture_width.setValue(capture_region.width)
-        self.capture_height.setValue(capture_region.height)
+        self._apply_capture_region_to_fields(capture_region)
 
         self.status_label.setText("Capture region updated")
-        self._on_widget_changed()
-
-    def _on_draw_trigger_roi_clicked(self):
-        capture_region = CaptureRegion(
-            left=self.capture_left.value(),
-            top=self.capture_top.value(),
-            width=self.capture_width.value(),
-            height=self.capture_height.value(),
-        )
-
-        if capture_region.width <= 0 or capture_region.height <= 0:
-            QMessageBox.warning(
-                self,
-                "Capture Region Required",
-                "Set a valid Capture Region before drawing the Trigger ROI."
-            )
-            return
-
-        dialog = RegionDragCaptureDialog(
-            title="Draw Trigger ROI",
-            instructions=(
-                "Draw the trigger/drop zone inside the current Capture Region.\n"
-                "This sets Trigger ROI: X, Y, W, and H relative to the Capture Region."
-            ),
-            parent=self
-        )
-
-        if dialog.exec() != QDialog.Accepted or dialog.selected_rect is None:
-            return
-
-        trigger_roi = ROI.from_screen_tuple_relative_to_capture(
-            key="object_roi",
-            label="Trigger ROI",
-            rect_tuple=dialog.selected_rect,
-            capture_region=capture_region,
-            roles={"trigger", "object"},
-        )
-
-        self.object_x.setValue(trigger_roi.x)
-        self.object_y.setValue(trigger_roi.y)
-        self.object_w.setValue(trigger_roi.width)
-        self.object_h.setValue(trigger_roi.height)
-
-        self.status_label.setText("Trigger ROI updated")
         self._on_widget_changed()
 
     def _on_draw_trigger_roi_clicked(self):
@@ -1144,10 +1097,7 @@ class control_panel(QWidget, control_panel_ui):
         )
         trigger_roi.clamp_to_capture(capture_region)
 
-        self.object_x.setValue(trigger_roi.x)
-        self.object_y.setValue(trigger_roi.y)
-        self.object_w.setValue(trigger_roi.width)
-        self.object_h.setValue(trigger_roi.height)
+        self._apply_object_roi_to_fields(trigger_roi)
 
         self.status_label.setText("Trigger ROI updated")
         self._on_widget_changed()
@@ -1381,15 +1331,8 @@ class control_panel(QWidget, control_panel_ui):
             roles={"trigger", "object"},
         )
 
-        self.subject_x.setValue(subject_roi.x)
-        self.subject_y.setValue(subject_roi.y)
-        self.subject_w.setValue(subject_roi.width)
-        self.subject_h.setValue(subject_roi.height)
-
-        self.object_x.setValue(object_roi.x)
-        self.object_y.setValue(object_roi.y)
-        self.object_w.setValue(object_roi.width)
-        self.object_h.setValue(object_roi.height)
+        self._apply_subject_roi_to_fields(subject_roi)
+        self._apply_object_roi_to_fields(object_roi)
 
         self.motion_min_area.setValue(max(100, min(50000, cfg["motion"]["min_area"])))
         
