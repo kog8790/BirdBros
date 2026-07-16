@@ -144,6 +144,42 @@ class ROI:
         }
 
     @classmethod
+    def subject(
+        cls,
+        x: int,
+        y: int,
+        width: int,
+        height: int,
+    ) -> "ROI":
+        return cls(
+            key="subject_roi",
+            label="Subject ROI",
+            x=int(x),
+            y=int(y),
+            width=max(1, int(width)),
+            height=max(1, int(height)),
+            roles={"subject"},
+        )
+
+    @classmethod
+    def trigger_object(
+        cls,
+        x: int,
+        y: int,
+        width: int,
+        height: int,
+    ) -> "ROI":
+        return cls(
+            key="object_roi",
+            label="Trigger ROI",
+            x=int(x),
+            y=int(y),
+            width=max(1, int(width)),
+            height=max(1, int(height)),
+            roles={"trigger", "object"},
+        )
+
+    @classmethod
     def from_screen_tuple_relative_to_capture(
         cls,
         key: str,
@@ -167,6 +203,20 @@ class ROI:
         roi.clamp_to_capture(capture_region)
 
         return roi
+
+    @classmethod
+    def trigger_object_from_screen_tuple(
+        cls,
+        rect_tuple,
+        capture_region: CaptureRegion,
+    ) -> "ROI":
+        return cls.from_screen_tuple_relative_to_capture(
+            key="object_roi",
+            label="Trigger ROI",
+            rect_tuple=rect_tuple,
+            capture_region=capture_region,
+            roles={"trigger", "object"},
+        )
 
 
 class ROICollection:

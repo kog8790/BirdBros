@@ -1083,19 +1083,10 @@ class control_panel(QWidget, control_panel_ui):
         if dialog.exec() != QDialog.Accepted or dialog.selected_rect is None:
             return
 
-        screen_x, screen_y, screen_w, screen_h = dialog.selected_rect
-        local_x, local_y = capture_region.screen_to_local(screen_x, screen_y)
-
-        trigger_roi = ROI(
-            key="object_roi",
-            label="Trigger ROI",
-            x=local_x,
-            y=local_y,
-            width=screen_w,
-            height=screen_h,
-            roles={"trigger", "object"},
+        trigger_roi = ROI.trigger_object_from_screen_tuple(
+            rect_tuple=dialog.selected_rect,
+            capture_region=capture_region,
         )
-        trigger_roi.clamp_to_capture(capture_region)
 
         self._apply_object_roi_to_fields(trigger_roi)
 
@@ -1199,24 +1190,18 @@ class control_panel(QWidget, control_panel_ui):
     def get_current_config(self):
         capture_region = self._current_capture_region()
 
-        subject_roi = ROI(
-            key="subject_roi",
-            label="Subject ROI",
+        subject_roi = ROI.subject(
             x=self.subject_x.value(),
             y=self.subject_y.value(),
             width=self.subject_w.value(),
             height=self.subject_h.value(),
-            roles={"subject"},
         )
 
-        object_roi = ROI(
-            key="object_roi",
-            label="Trigger ROI",
+        object_roi = ROI.trigger_object(
             x=self.object_x.value(),
             y=self.object_y.value(),
             width=self.object_w.value(),
             height=self.object_h.value(),
-            roles={"trigger", "object"},
         )
 
         default_task = DEFAULT_CONFIG["task_labels"]
