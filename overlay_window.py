@@ -40,7 +40,7 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import QApplication, QWidget
 
-from draw_regions import LiveRegionInteraction
+from draw_regions import CAPTURE_TARGET_KEY, LiveRegionInteraction
 
 
 """                 ### SEGMENT: OVERLAY WINDOW CLASS ###
@@ -206,10 +206,13 @@ class overlay_window(QWidget):
         point = self._global_point_from_event(event)
 
         if self.region_interaction.is_dragging:
-            self.region_interaction.drag_to_screen_point(
+            preview = self.region_interaction.drag_to_screen_point(
                 int(point.x()),
                 int(point.y()),
             )
+
+            self._apply_live_capture_preview_geometry(preview)
+
             event.accept()
             self.update()
             return
@@ -221,6 +224,22 @@ class overlay_window(QWidget):
         self._set_cursor_from_role(hover.cursor_role)
         event.accept()
         self.update()
+
+    def _apply_live_capture_preview_geometry(self, preview):
+        if preview is None or preview.drag is None:
+            return
+
+        if preview.drag.target_key != CAPTURE_TARGET_KEY:
+            return
+
+        capture_rect = preview.capture_rect
+
+        self.set_overlay_geometry(
+            left=int(capture_rect.x),
+            top=int(capture_rect.y),
+            width=int(capture_rect.width),
+            height=int(capture_rect.height),
+        )
 
     def mouseReleaseEvent(self, event):
         if (
@@ -246,7 +265,23 @@ class overlay_window(QWidget):
             and self.region_interaction is not None
             and self.region_interaction.is_dragging
         ):
+            was_capture_drag = (
+                self.region_interaction.drag is not None
+                and self.region_interaction.drag.target_key == CAPTURE_TARGET_KEY
+            )
+
             self.region_interaction.cancel_drag()
+
+            if was_capture_drag:
+                state = self.region_interaction.get_preview_state()
+                capture_rect = state.capture_rect
+                self.set_overlay_geometry(
+                    left=int(capture_rect.x),
+                    top=int(capture_rect.y),
+                    width=int(capture_rect.width),
+                    height=int(capture_rect.height),
+                )
+
             self._poll_region_hover()
             event.accept()
             self.update()
@@ -313,9 +348,6 @@ class overlay_window(QWidget):
 
         state = self.region_interaction.get_preview_state()
 
-        capture_pen = QPen(QColor(116, 215, 196, 210))
-        capture_pen.setWidth(2)
-
         roi_pen = QPen(QColor(255, 212, 121, 230))
         roi_pen.setWidth(3)
 
@@ -325,10 +357,9 @@ class overlay_window(QWidget):
 
         painter.setRenderHint(QPainter.Antialiasing)
 
-        capture_rect = self._screen_rect_to_local_qrect(state.capture_rect)
-        painter.setPen(capture_pen)
-        painter.drawRect(capture_rect)
-
+        # Capture Region preview drawing is intentionally disabled.
+        # During capture resize, the capture region must be represented by the
+        # actual overlay window geometry, not by a second painted rectangle.
         for key, rect in state.roi_rects.items():
             local_rect = self._screen_rect_to_local_qrect(rect)
 
