@@ -739,98 +739,15 @@ class control_panel(QWidget, control_panel_ui):
 
         return row
 
-    def _make_click_sequence_step_row(self, index, step):
-        row = QWidget()
-        row.setObjectName("clickSequenceStep")
+    def _capture_click_sequence_position(self, x_spin, y_spin):
+        dialog = MousePositionCaptureDialog(self)
 
-        row_layout = QVBoxLayout(row)
-        row_layout.setContentsMargins(8, 8, 8, 8)
-        row_layout.setSpacing(6)
-
-        title = QLabel(f"Click {index + 1}")
-        title.setObjectName("clickSequenceTitle")
-
-        x_spin = self._make_spinbox(0, 10000)
-        y_spin = self._make_spinbox(0, 10000)
-        hold_spin = self._make_spinbox(0, 10000)
-        delay_spin = self._make_spinbox(0, 10000)
-        move_spin = self._make_spinbox(0, 10000)
-
-        for spinbox in [x_spin, y_spin, hold_spin, delay_spin, move_spin]:
-            spinbox.setMinimumWidth(0)
-            spinbox.setMaximumWidth(92)
-            spinbox.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-
-        x_spin.setValue(int(step.get("x", 735)))
-        y_spin.setValue(int(step.get("y", 586)))
-        hold_spin.setValue(int(float(step.get("hold_duration", 0.0)) * 1000))
-        delay_spin.setValue(int(float(step.get("delay_after", 0.1)) * 1000))
-        move_spin.setValue(int(float(step.get("move_duration", 0.0)) * 1000))
-
-        position_layout = QGridLayout()
-        position_layout.setContentsMargins(0, 0, 0, 0)
-        position_layout.setHorizontalSpacing(8)
-        position_layout.setVerticalSpacing(3)
-
-        timing_layout = QGridLayout()
-        timing_layout.setContentsMargins(0, 0, 0, 0)
-        timing_layout.setHorizontalSpacing(8)
-        timing_layout.setVerticalSpacing(3)
-
-        position_layout.addWidget(QLabel("X"), 0, 0)
-        capture_button = QPushButton("Capture Position")
-        capture_button.setObjectName("secondaryButton")
-
-        position_layout.addWidget(QLabel("X"), 0, 0)
-        position_layout.addWidget(QLabel("Y"), 0, 1)
-        position_layout.addWidget(x_spin, 1, 0)
-        position_layout.addWidget(y_spin, 1, 1)
-        position_layout.addWidget(capture_button, 2, 0, 1, 2)
-
-        timing_layout.addWidget(QLabel("Hold ms"), 0, 0)
-        timing_layout.addWidget(QLabel("Delay ms"), 0, 1)
-        timing_layout.addWidget(QLabel("Move ms"), 0, 2)
-        timing_layout.addWidget(hold_spin, 1, 0)
-        timing_layout.addWidget(delay_spin, 1, 1)
-        timing_layout.addWidget(move_spin, 1, 2)
-
-        position_layout.setColumnStretch(0, 1)
-        position_layout.setColumnStretch(1, 1)
-
-        timing_layout.setColumnStretch(0, 1)
-        timing_layout.setColumnStretch(1, 1)
-        timing_layout.setColumnStretch(2, 1)
-
-        row_layout.addWidget(title)
-        row_layout.addLayout(position_layout)
-        row_layout.addLayout(timing_layout)
-
-        def capture_position():
-            dialog = MousePositionCaptureDialog(self)
-
-            if dialog.exec() == QDialog.Accepted and dialog.captured_position:
-                x, y = dialog.captured_position
-                x_spin.setValue(x)
-                y_spin.setValue(y)
-                self._on_widget_changed()
-
-        capture_button.clicked.connect(capture_position)
-
-        for spinbox in [x_spin, y_spin, hold_spin, delay_spin, move_spin]:
-            spinbox.valueChanged.connect(self._on_widget_changed)
-
-        widgets = {
-            "row": row,
-            "x": x_spin,
-            "y": y_spin,
-            "capture_button": capture_button,
-            "hold_duration": hold_spin,
-            "delay_after": delay_spin,
-            "move_duration": move_spin
-        }
-
-        return widgets
-
+        if dialog.exec() == QDialog.Accepted and dialog.captured_position:
+            x, y = dialog.captured_position
+            x_spin.setValue(x)
+            y_spin.setValue(y)
+            self._on_widget_changed()
+            
     def _clear_click_sequence_rows(self):
         while self.reward_click_sequence_layout.count():
             item = self.reward_click_sequence_layout.takeAt(0)
