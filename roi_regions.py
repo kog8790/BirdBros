@@ -106,6 +106,68 @@ class ROI:
             "h": int(self.height),
         }
 
+    @classmethod
+    def from_percent_config(
+        cls,
+        key: str,
+        label: str,
+        config: dict,
+        capture_region: CaptureRegion,
+        roles: Iterable[str] = (),
+    ) -> "ROI":
+        region = config.get(key, {})
+
+        roi = cls(
+            key=key,
+            label=label,
+            x=int(float(region.get("x_pct", 0.0)) * capture_region.width),
+            y=int(float(region.get("y_pct", 0.0)) * capture_region.height),
+            width=int(float(region.get("w_pct", 0.0)) * capture_region.width),
+            height=int(float(region.get("h_pct", 0.0)) * capture_region.height),
+            roles=set(roles),
+        )
+
+        roi.clamp_to_capture(capture_region)
+        return roi
+
+    def to_percent_config(self, capture_region: CaptureRegion) -> dict:
+        capture_width = max(1, int(capture_region.width))
+        capture_height = max(1, int(capture_region.height))
+
+        self.clamp_to_capture(capture_region)
+
+        return {
+            "x_pct": float(self.x) / capture_width,
+            "y_pct": float(self.y) / capture_height,
+            "w_pct": float(self.width) / capture_width,
+            "h_pct": float(self.height) / capture_height,
+        }
+
+    @classmethod
+    def from_screen_tuple_relative_to_capture(
+        cls,
+        key: str,
+        label: str,
+        rect_tuple,
+        capture_region: CaptureRegion,
+        roles: Iterable[str] = (),
+    ) -> "ROI":
+        screen_x, screen_y, width, height = rect_tuple
+        local_x, local_y = capture_region.screen_to_local(screen_x, screen_y)
+
+        roi = cls(
+            key=key,
+            label=label,
+            x=int(local_x),
+            y=int(local_y),
+            width=max(1, int(width)),
+            height=max(1, int(height)),
+            roles=set(roles),
+        )
+        roi.clamp_to_capture(capture_region)
+
+        return roi
+
 
 class ROICollection:
     def __init__(self, rois=None):

@@ -48,7 +48,9 @@ from PySide6.QtWidgets import (
 
 from config_manager import DEFAULT_CONFIG, load_config, save_config
 from control_panel_ui import control_panel_ui
+from capture_regions import CaptureRegion
 from draw_regions import RegionDragCaptureDialog
+from roi_regions import ROI
 from macos_permissions import (
     accessibility_trusted,
     request_accessibility_trust,
@@ -1030,6 +1032,14 @@ class control_panel(QWidget, control_panel_ui):
 
         self.detection_paused_changed.emit(self.detection_paused)
 
+    def _current_capture_region(self):
+        return CaptureRegion(
+            left=self.capture_left.value(),
+            top=self.capture_top.value(),
+            width=self.capture_width.value(),
+            height=self.capture_height.value(),
+        )
+
     def _on_draw_capture_region_clicked(self):
         dialog = RegionDragCaptureDialog(
             title="Draw Capture Region",
@@ -1043,23 +1053,64 @@ class control_panel(QWidget, control_panel_ui):
         if dialog.exec() != QDialog.Accepted or dialog.selected_rect is None:
             return
 
-        x, y, width, height = dialog.selected_rect
+        capture_region = CaptureRegion.from_screen_tuple(dialog.selected_rect)
 
-        self.capture_left.setValue(max(0, x))
-        self.capture_top.setValue(max(0, y))
-        self.capture_width.setValue(max(1, width))
-        self.capture_height.setValue(max(1, height))
+        self.capture_left.setValue(capture_region.left)
+        self.capture_top.setValue(capture_region.top)
+        self.capture_width.setValue(capture_region.width)
+        self.capture_height.setValue(capture_region.height)
 
         self.status_label.setText("Capture region updated")
         self._on_widget_changed()
 
     def _on_draw_trigger_roi_clicked(self):
-        capture_left = self.capture_left.value()
-        capture_top = self.capture_top.value()
-        capture_width = self.capture_width.value()
-        capture_height = self.capture_height.value()
+        capture_region = CaptureRegion(
+            left=self.capture_left.value(),
+            top=self.capture_top.value(),
+            width=self.capture_width.value(),
+            height=self.capture_height.value(),
+        )
 
-        if capture_width <= 0 or capture_height <= 0:
+        if capture_region.width <= 0 or capture_region.height <= 0:
+            QMessageBox.warning(
+                self,
+                "Capture Region Required",
+                "Set a valid Capture Region before drawing the Trigger ROI."
+            )
+            return
+
+        dialog = RegionDragCaptureDialog(
+            title="Draw Trigger ROI",
+            instructions=(
+                "Draw the trigger/drop zone inside the current Capture Region.\n"
+                "This sets Trigger ROI: X, Y, W, and H relative to the Capture Region."
+            ),
+            parent=self
+        )
+
+        if dialog.exec() != QDialog.Accepted or dialog.selected_rect is None:
+            return
+
+        trigger_roi = ROI.from_screen_tuple_relative_to_capture(
+            key="object_roi",
+            label="Trigger ROI",
+            rect_tuple=dialog.selected_rect,
+            capture_region=capture_region,
+            roles={"trigger", "object"},
+        )
+
+        self.object_x.setValue(trigger_roi.x)
+        self.object_y.setValue(trigger_roi.y)
+        self.object_w.setValue(trigger_roi.width)
+        self.object_h.setValue(trigger_roi.height)
+
+        self.status_label.setText("Trigger ROI updated")
+        self._on_widget_changed()
+
+    def _on_draw_trigger_roi_clicked(self):
+        capture_region = self._current_capture_region()
+
+        if capture_region.width <= 0 or capture_region.height <= 0:
             QMessageBox.warning(
                 self,
                 "Capture Region Required",
@@ -1080,23 +1131,23 @@ class control_panel(QWidget, control_panel_ui):
             return
 
         screen_x, screen_y, screen_w, screen_h = dialog.selected_rect
+        local_x, local_y = capture_region.screen_to_local(screen_x, screen_y)
 
-        relative_x = screen_x - capture_left
-        relative_y = screen_y - capture_top
+        trigger_roi = ROI(
+            key="object_roi",
+            label="Trigger ROI",
+            x=local_x,
+            y=local_y,
+            width=screen_w,
+            height=screen_h,
+            roles={"trigger", "object"},
+        )
+        trigger_roi.clamp_to_capture(capture_region)
 
-        clamped_x = max(0, min(relative_x, capture_width - 1))
-        clamped_y = max(0, min(relative_y, capture_height - 1))
-
-        max_w = max(1, capture_width - clamped_x)
-        max_h = max(1, capture_height - clamped_y)
-
-        clamped_w = max(1, min(screen_w, max_w))
-        clamped_h = max(1, min(screen_h, max_h))
-
-        self.object_x.setValue(int(clamped_x))
-        self.object_y.setValue(int(clamped_y))
-        self.object_w.setValue(int(clamped_w))
-        self.object_h.setValue(int(clamped_h))
+        self.object_x.setValue(trigger_roi.x)
+        self.object_y.setValue(trigger_roi.y)
+        self.object_w.setValue(trigger_roi.width)
+        self.object_h.setValue(trigger_roi.height)
 
         self.status_label.setText("Trigger ROI updated")
         self._on_widget_changed()

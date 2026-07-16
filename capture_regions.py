@@ -56,8 +56,22 @@ class CaptureRegion:
             "width": int(self.width),
             "height": int(self.height),
         }
-        
-        
+
+    @classmethod
+    def from_screen_tuple(cls, rect_tuple) -> "CaptureRegion":
+        x, y, width, height = rect_tuple
+
+        region = cls(
+            left=max(0, int(x)),
+            top=max(0, int(y)),
+            width=max(1, int(width)),
+            height=max(1, int(height)),
+        )
+        region.clamp_size()
+
+        return region
+
+
 class CaptureRegionCollection:
     def __init__(self, regions=None):
         self.regions = list(regions or [])
@@ -79,4 +93,5 @@ class CaptureRegionCollection:
 
     def __getitem__(self, index):
         return self.regions[index]
+
 
