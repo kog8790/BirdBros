@@ -1197,12 +1197,7 @@ class control_panel(QWidget, control_panel_ui):
     # ================================
 
     def get_current_config(self):
-        capture_region = CaptureRegion(
-            left=self.capture_left.value(),
-            top=self.capture_top.value(),
-            width=self.capture_width.value(),
-            height=self.capture_height.value(),
-        )
+        capture_region = self._current_capture_region()
 
         subject_roi = ROI(
             key="subject_roi",
@@ -1301,10 +1296,8 @@ class control_panel(QWidget, control_panel_ui):
     def _load_config_into_widgets(self):
         cfg = self.config
 
-        self.capture_left.setValue(cfg["capture_region"]["left"])
-        self.capture_top.setValue(cfg["capture_region"]["top"])
-        self.capture_width.setValue(cfg["capture_region"]["width"])
-        self.capture_height.setValue(cfg["capture_region"]["height"])
+        capture_region = CaptureRegion.from_config(cfg)
+        self._apply_capture_region_to_fields(capture_region)
         
         video_cfg = cfg.get("video_input", DEFAULT_CONFIG["video_input"])
 
@@ -1312,8 +1305,6 @@ class control_panel(QWidget, control_panel_ui):
         self.video_path.setText(video_cfg.get("video_path", ""))
         self.video_loop.setChecked(video_cfg.get("loop_video", True))
         self.video_fps.setValue(video_cfg.get("fps", 30))
-
-        capture_region = CaptureRegion.from_config(cfg)
 
         subject_roi = ROI.from_percent_config(
             key="subject_roi",
