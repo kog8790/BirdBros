@@ -173,6 +173,15 @@ def main():
     def on_overlay_region_edit_committed(result):
         object_roi = result.rois.get("object_roi")
 
+        capture_region = None
+        if result.changed_key == "capture_region":
+            capture_region = result.capture_region
+
+        panel.apply_live_region_edit(
+            capture_region=capture_region,
+            object_roi=object_roi,
+        )
+
         object_roi_config = None
         if object_roi is not None:
             object_roi_config = object_roi.to_percent_config(
@@ -180,9 +189,13 @@ def main():
             )
 
         logger.log_info(
-            "Overlay region edit committed",
+            "Overlay region edit committed through control panel",
             changed_key=result.changed_key,
-            capture_region=result.capture_region.to_config(),
+            capture_region=(
+                result.capture_region.to_config()
+                if capture_region is not None
+                else None
+            ),
             object_roi=object_roi_config,
         )
 

@@ -972,6 +972,44 @@ class control_panel(QWidget, control_panel_ui):
         self.status_label.setText("Trigger ROI updated")
         self._on_widget_changed()
 
+    def apply_live_region_edit(self, capture_region=None, object_roi=None, subject_roi=None):
+        widgets = [
+            self.capture_left,
+            self.capture_top,
+            self.capture_width,
+            self.capture_height,
+            self.subject_x,
+            self.subject_y,
+            self.subject_w,
+            self.subject_h,
+            self.object_x,
+            self.object_y,
+            self.object_w,
+            self.object_h,
+        ]
+
+        previous_signal_states = {}
+
+        for widget in widgets:
+            previous_signal_states[widget] = widget.blockSignals(True)
+
+        try:
+            if capture_region is not None:
+                self._apply_capture_region_to_fields(capture_region)
+
+            if subject_roi is not None:
+                self._apply_subject_roi_to_fields(subject_roi)
+
+            if object_roi is not None:
+                self._apply_object_roi_to_fields(object_roi)
+
+        finally:
+            for widget in widgets:
+                widget.blockSignals(previous_signal_states[widget])
+
+        self.status_label.setText("Live region edit applied")
+        self._on_widget_changed()
+
     def _on_exit_clicked(self):
         self.exit_requested.emit()
 
