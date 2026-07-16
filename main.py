@@ -35,6 +35,9 @@ from overlay_window import overlay_window, get_or_create_qt_app
 from status_window import status_window
 from control_panel import control_panel
 from logger import Logger
+from capture_regions import CaptureRegion
+from roi_regions import ROI
+from draw_regions import LiveRegionInteraction
 from session_storyboard import session_storyboard
 from api_key_store import get_openai_api_key
 from first_run_setup import run_first_run_setup
@@ -150,6 +153,42 @@ def main():
         height=42
     )
 
+    def build_overlay_region_interaction(active_config):
+        active_capture_region = CaptureRegion.from_config(active_config)
+        active_object_roi = ROI.trigger_object_from_percent_config(
+            config=active_config,
+            capture_region=active_capture_region,
+        )
+
+        return LiveRegionInteraction(
+            capture_region=active_capture_region,
+            rois=[active_object_roi],
+        )
+
+    def refresh_overlay_region_interaction():
+        overlay.set_live_region_interaction(
+            build_overlay_region_interaction(current_config)
+        )
+
+    def on_overlay_region_edit_committed(result):
+        object_roi = result.rois.get("object_roi")
+
+        object_roi_config = None
+        if object_roi is not None:
+            object_roi_config = object_roi.to_percent_config(
+                result.capture_region
+            )
+
+        logger.log_info(
+            "Overlay region edit committed",
+            changed_key=result.changed_key,
+            capture_region=result.capture_region.to_config(),
+            object_roi=object_roi_config,
+        )
+
+    overlay.region_edit_committed.connect(on_overlay_region_edit_committed)
+    refresh_overlay_region_interaction()
+
     video_config = current_config.get("video_input", {}).copy()
 
     def create_camera(active_region, active_video_config):
@@ -228,18 +267,36 @@ def main():
         minimum_top = active_screen.top() + 10
         return max(minimum_top, preferred_top)
 
+    status_anchor_frozen = False
+
+    def set_status_anchor_frozen(frozen: bool):
+        nonlocal status_anchor_frozen
+        status_anchor_frozen = frozen
+
+    def anchor_status_to_region(active_region, *, force=False):
+        if status_anchor_frozen and not force:
+            return
+
+        active_screen, _, _, _, _ = calculate_panel_geometry()
+        active_status_height = calculate_status_height(active_screen)
+
+        status.set_status_geometry(
+            left=active_region["left"],
+            top=calculate_status_top(
+                active_screen,
+                active_region,
+                active_status_height
+            ),
+            width=active_region["width"],
+            height=active_status_height
+        )
+
     screen, panel_x, panel_y, panel_width, panel_height = calculate_panel_geometry()
 
     panel.resize(panel_width, panel_height)
     panel.move(panel_x, panel_y)
 
-    status_height = calculate_status_height(screen)
-    status.set_status_geometry(
-        left=region["left"],
-        top=calculate_status_top(screen, region, status_height),
-        width=region["width"],
-        height=status_height
-    )
+    anchor_status_to_region(region, force=True)
     panel.show()
     panel.raise_()
     panel.activateWindow()
@@ -419,16 +476,10 @@ def main():
                     width=region["width"],
                     height=region["height"]
                 )
+                refresh_overlay_region_interaction()
 
                 screen, panel_x, panel_y, panel_width, panel_height = calculate_panel_geometry()
-                status_height = calculate_status_height(screen)
-
-                status.set_status_geometry(
-                    left=region["left"],
-                    top=calculate_status_top(screen, region, status_height),
-                    width=region["width"],
-                    height=status_height
-                )
+                anchor_status_to_region(region)
 
                 reset_runtime_state(
                     event_text="Warmup",
@@ -461,6 +512,7 @@ def main():
                 )
 
                 logger.log_info("ROI updated", subject_roi=current_subject_roi, object_roi=current_object_roi)
+                refresh_overlay_region_interaction()
                 prev_subject_roi = current_subject_roi.copy()
                 prev_object_roi = current_object_roi.copy()
 
