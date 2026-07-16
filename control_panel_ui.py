@@ -587,6 +587,42 @@ class control_panel_ui:
             "webhook_visible": webhook_visible,
         }
 
+    def _apply_behavior_mode_visibility(self, mode):
+        advanced_visible = mode == "advanced"
+
+        self.subject_label_widget.setVisible(advanced_visible)
+        self.subject_label.setVisible(advanced_visible)
+
+        self.object_label_widget.setVisible(advanced_visible)
+        self.object_label.setVisible(advanced_visible)
+
+        self.target_zone_label_widget.setVisible(advanced_visible)
+        self.target_zone_label.setVisible(advanced_visible)
+
+        self.action_label_widget.setVisible(advanced_visible)
+        self.action_label.setVisible(advanced_visible)
+
+        self.subject_group.setVisible(advanced_visible)
+
+        if advanced_visible:
+            self.object_group.setTitle("Object ROI")
+        else:
+            self.object_group.setTitle("Trigger ROI")
+
+        return {
+            "advanced_visible": advanced_visible,
+        }
+
+    def _apply_video_input_visibility(self, input_mode):
+        video_file_visible = input_mode == "video_file"
+
+        self.video_path_row.setVisible(video_file_visible)
+        self.video_loop_row.setVisible(video_file_visible)
+
+        return {
+            "video_file_visible": video_file_visible,
+        }
+
     def _make_click_sequence_step_row(self, index, step):
         row = QWidget()
         row.setObjectName("clickSequenceStep")

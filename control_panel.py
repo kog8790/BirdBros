@@ -1006,39 +1006,15 @@ class control_panel(QWidget, control_panel_ui):
     # ================================
     
     def _on_behavior_mode_changed(self):
-        advanced_visible = (
-            self.behavior_mode.currentText() == "advanced"
+        self._apply_behavior_mode_visibility(
+            self.behavior_mode.currentText()
         )
-
-        self.subject_label_widget.setVisible(advanced_visible)
-        self.subject_label.setVisible(advanced_visible)
-
-        self.object_label_widget.setVisible(advanced_visible)
-        self.object_label.setVisible(advanced_visible)
-
-        self.target_zone_label_widget.setVisible(advanced_visible)
-        self.target_zone_label.setVisible(advanced_visible)
-
-        self.action_label_widget.setVisible(advanced_visible)
-        self.action_label.setVisible(advanced_visible)
-
-        self.subject_group.setVisible(advanced_visible)
-
-        if advanced_visible:
-            self.object_group.setTitle("Object ROI")
-        else:
-            self.object_group.setTitle("Trigger ROI")
-
         self._on_widget_changed()
 
     def _on_video_input_changed(self):
-        input_mode = self.video_mode.currentText()
-
-        video_file_visible = input_mode == "video_file"
-
-        self.video_path_row.setVisible(video_file_visible)
-        self.video_loop_row.setVisible(video_file_visible)
-
+        self._apply_video_input_visibility(
+            self.video_mode.currentText()
+        )
         self._on_widget_changed()
 
     # ================================
