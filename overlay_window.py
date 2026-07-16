@@ -42,6 +42,11 @@ from PySide6.QtWidgets import QApplication, QWidget
 
 from draw_regions import CAPTURE_TARGET_KEY, LiveRegionInteraction
 
+try:
+    from AppKit import NSCursor
+except Exception:
+    NSCursor = None
+
 
 """                 ### SEGMENT: OVERLAY WINDOW CLASS ###
 overlay_window
@@ -76,6 +81,8 @@ class overlay_window(QWidget):
         self.region_interaction = None
         self._mouse_passthrough = True
         self._hover_poll_interval_ms = 33
+        self._cursor_role = "default"
+        self._using_override_cursor = False
 
         self.setWindowTitle("Bird Bros Overlay")
         self.setGeometry(QRect(self.left, self.top, self.width_value, self.height_value))
@@ -111,7 +118,7 @@ class overlay_window(QWidget):
         self.region_interaction = interaction
 
         if self.region_interaction is None:
-            self.unsetCursor()
+            self._clear_region_cursor()
             self._set_mouse_passthrough(True)
             self.update()
             return
@@ -137,10 +144,10 @@ class overlay_window(QWidget):
         )
 
         if hover.has_target:
-            self._set_cursor_from_role(hover.cursor_role)
             self._set_mouse_passthrough(False)
+            self._set_cursor_from_role(hover.cursor_role)
         else:
-            self.unsetCursor()
+            self._clear_region_cursor()
             self._set_mouse_passthrough(True)
 
         self.update()
@@ -168,7 +175,62 @@ class overlay_window(QWidget):
             "resize_diagonal_backward": Qt.SizeFDiagCursor,
         }
 
-        self.setCursor(cursor_map.get(cursor_role, Qt.ArrowCursor))
+        cursor_shape = cursor_map.get(cursor_role, Qt.ArrowCursor)
+        cursor = QCursor(cursor_shape)
+
+        self.setCursor(cursor)
+
+        if self._using_override_cursor:
+            QApplication.changeOverrideCursor(cursor)
+        else:
+            QApplication.setOverrideCursor(cursor)
+            self._using_override_cursor = True
+
+        self._set_native_cursor_from_role(cursor_role)
+        self._cursor_role = cursor_role
+
+    def _set_native_cursor_from_role(self, cursor_role: str):
+        if NSCursor is None:
+            return
+
+        if cursor_role == "resize_horizontal":
+            NSCursor.resizeLeftRightCursor().set()
+            return
+
+        if cursor_role == "resize_vertical":
+            NSCursor.resizeUpDownCursor().set()
+            return
+
+        if cursor_role in {
+            "resize_diagonal_forward",
+            "resize_diagonal_backward",
+        }:
+            # AppKit does not expose public diagonal resize cursors.
+            # Use a visible native resize cursor rather than silently falling
+            # back to the normal arrow.
+            NSCursor.resizeLeftRightCursor().set()
+            return
+
+        if cursor_role == "move":
+            NSCursor.openHandCursor().set()
+            return
+
+        NSCursor.arrowCursor().set()
+
+    def _clear_region_cursor(self):
+        if self._cursor_role == "default" and not self._using_override_cursor:
+            return
+
+        self._cursor_role = "default"
+        self.unsetCursor()
+
+        while QApplication.overrideCursor() is not None:
+            QApplication.restoreOverrideCursor()
+
+        self._using_override_cursor = False
+
+        if NSCursor is not None:
+            NSCursor.arrowCursor().set()
 
     def _global_point_from_event(self, event):
         if hasattr(event, "globalPosition"):
@@ -195,6 +257,7 @@ class overlay_window(QWidget):
             return
 
         self._set_mouse_passthrough(False)
+        self._set_cursor_from_role(self.region_interaction.hover.cursor_role)
         event.accept()
         self.update()
 
@@ -221,7 +284,12 @@ class overlay_window(QWidget):
             int(point.x()),
             int(point.y()),
         )
-        self._set_cursor_from_role(hover.cursor_role)
+
+        if hover.has_target:
+            self._set_cursor_from_role(hover.cursor_role)
+        else:
+            self._clear_region_cursor()
+
         event.accept()
         self.update()
 
