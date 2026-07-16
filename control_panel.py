@@ -1247,11 +1247,32 @@ class control_panel(QWidget, control_panel_ui):
     # ================================
 
     def get_current_config(self):
-        def px_to_pct(value_px, total):
-            return value_px / total if total else 0
+        capture_region = CaptureRegion(
+            left=self.capture_left.value(),
+            top=self.capture_top.value(),
+            width=self.capture_width.value(),
+            height=self.capture_height.value(),
+        )
 
-        capture_width = self.capture_width.value()
-        capture_height = self.capture_height.value()
+        subject_roi = ROI(
+            key="subject_roi",
+            label="Subject ROI",
+            x=self.subject_x.value(),
+            y=self.subject_y.value(),
+            width=self.subject_w.value(),
+            height=self.subject_h.value(),
+            roles={"subject"},
+        )
+
+        object_roi = ROI(
+            key="object_roi",
+            label="Trigger ROI",
+            x=self.object_x.value(),
+            y=self.object_y.value(),
+            width=self.object_w.value(),
+            height=self.object_h.value(),
+            roles={"trigger", "object"},
+        )
 
         default_task = DEFAULT_CONFIG["task_labels"]
 
@@ -1268,30 +1289,15 @@ class control_panel(QWidget, control_panel_ui):
             }
 
         return {
-            "capture_region": {
-                "left": self.capture_left.value(),
-                "top": self.capture_top.value(),
-                "width": capture_width,
-                "height": capture_height
-            },
+            "capture_region": capture_region.to_config(),
             "video_input": {
                 "mode": self.video_mode.currentText(),
                 "video_path": self.video_path.text().strip(),
                 "loop_video": self.video_loop.isChecked(),
                 "fps": self.video_fps.value()
             },
-            "subject_roi": {
-                "x_pct": px_to_pct(self.subject_x.value(), capture_width),
-                "y_pct": px_to_pct(self.subject_y.value(), capture_height),
-                "w_pct": px_to_pct(self.subject_w.value(), capture_width),
-                "h_pct": px_to_pct(self.subject_h.value(), capture_height)
-            },
-            "object_roi": {
-                "x_pct": px_to_pct(self.object_x.value(), capture_width),
-                "y_pct": px_to_pct(self.object_y.value(), capture_height),
-                "w_pct": px_to_pct(self.object_w.value(), capture_width),
-                "h_pct": px_to_pct(self.object_h.value(), capture_height)
-            },
+            "subject_roi": subject_roi.to_percent_config(capture_region),
+            "object_roi": object_roi.to_percent_config(capture_region),
             "motion": {
                 "min_area": self.motion_min_area.value()
             },
@@ -1357,20 +1363,33 @@ class control_panel(QWidget, control_panel_ui):
         self.video_loop.setChecked(video_cfg.get("loop_video", True))
         self.video_fps.setValue(video_cfg.get("fps", 30))
 
-        def pct_to_px(value_pct, total):
-            return int(value_pct * total)
+        capture_region = CaptureRegion.from_config(cfg)
 
-        region = cfg["capture_region"]
+        subject_roi = ROI.from_percent_config(
+            key="subject_roi",
+            label="Subject ROI",
+            config=cfg,
+            capture_region=capture_region,
+            roles={"subject"},
+        )
 
-        self.subject_x.setValue(pct_to_px(cfg["subject_roi"]["x_pct"], region["width"]))
-        self.subject_y.setValue(pct_to_px(cfg["subject_roi"]["y_pct"], region["height"]))
-        self.subject_w.setValue(pct_to_px(cfg["subject_roi"]["w_pct"], region["width"]))
-        self.subject_h.setValue(pct_to_px(cfg["subject_roi"]["h_pct"], region["height"]))
+        object_roi = ROI.from_percent_config(
+            key="object_roi",
+            label="Trigger ROI",
+            config=cfg,
+            capture_region=capture_region,
+            roles={"trigger", "object"},
+        )
 
-        self.object_x.setValue(pct_to_px(cfg["object_roi"]["x_pct"], region["width"]))
-        self.object_y.setValue(pct_to_px(cfg["object_roi"]["y_pct"], region["height"]))
-        self.object_w.setValue(pct_to_px(cfg["object_roi"]["w_pct"], region["width"]))
-        self.object_h.setValue(pct_to_px(cfg["object_roi"]["h_pct"], region["height"]))
+        self.subject_x.setValue(subject_roi.x)
+        self.subject_y.setValue(subject_roi.y)
+        self.subject_w.setValue(subject_roi.width)
+        self.subject_h.setValue(subject_roi.height)
+
+        self.object_x.setValue(object_roi.x)
+        self.object_y.setValue(object_roi.y)
+        self.object_w.setValue(object_roi.width)
+        self.object_h.setValue(object_roi.height)
 
         self.motion_min_area.setValue(max(100, min(50000, cfg["motion"]["min_area"])))
         
