@@ -7,6 +7,7 @@ RESPONSIBILITIES:
 - Initialize and manage PySide6 overlay window
 - Display rendered overlay frames
 - Maintain correct position and size relative to capture region
+- Host live region editing interaction when provided by main.py
 
 USED BY:
 - main.py (visual output layer)
@@ -14,20 +15,32 @@ USED BY:
 INPUTS:
 - Overlay frames (RGBA)
 - Capture region geometry
+- Optional LiveRegionInteraction object
 
 OUTPUTS:
 - On-screen visual overlay
+- Optional live region edit commit signal
 
 DESIGN INTENT:
 Separate visualization from processing so the system can run headless or with UI.
 """
 
 import sys
+
 import cv2
 import numpy as np
-from PySide6.QtCore import Qt, QRect
-from PySide6.QtGui import QGuiApplication, QImage, QPainter
+from PySide6.QtCore import Qt, QRect, QTimer, Signal
+from PySide6.QtGui import (
+    QColor,
+    QCursor,
+    QGuiApplication,
+    QImage,
+    QPainter,
+    QPen,
+)
 from PySide6.QtWidgets import QApplication, QWidget
+
+from draw_regions import LiveRegionInteraction
 
 
 """                 ### SEGMENT: OVERLAY WINDOW CLASS ###
@@ -36,15 +49,20 @@ overlay_window
 STATE:
 - window geometry (position + size)
 - current frame buffer
+- optional live region interaction controller
+- mouse pass-through state
 
 BEHAVIOR:
 - Creates frameless, transparent window
 - Stays aligned with capture region
 - Updates displayed frame in real time
+- Can temporarily become mouse-interactive when cursor nears editable regions
 
 IMPORTANT:
 Must remain lightweight to avoid impacting frame loop performance."""
 class overlay_window(QWidget):
+    region_edit_committed = Signal(object)
+
     def __init__(self, left: int, top: int, width: int, height: int):
         super().__init__()
 
@@ -55,12 +73,16 @@ class overlay_window(QWidget):
 
         self.overlay_frame = np.zeros((height, width, 4), dtype=np.uint8)
 
+        self.region_interaction = None
+        self._mouse_passthrough = True
+        self._hover_poll_interval_ms = 33
+
         self.setWindowTitle("Bird Bros Overlay")
         self.setGeometry(QRect(self.left, self.top, self.width_value, self.height_value))
 
-        # The overlay is a visual guide, not a control surface.
-        # It should not fight the browser/video window for top-layer focus.
-        # The status window is the only UI element that should force always-on-top.
+        # The overlay starts as a visual guide, not a control surface.
+        # It becomes interactive only while the cursor is near an editable region
+        # or while a region drag is in progress.
         self.setWindowFlags(
             Qt.Window |
             Qt.FramelessWindowHint |
@@ -73,13 +95,169 @@ class overlay_window(QWidget):
         self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
         self.setAttribute(Qt.WA_ShowWithoutActivating, True)
         self.setFocusPolicy(Qt.NoFocus)
+        self.setMouseTracking(True)
+
+        self._hover_timer = QTimer(self)
+        self._hover_timer.timeout.connect(self._poll_region_hover)
+        self._hover_timer.start(self._hover_poll_interval_ms)
 
         self.show()
+
+    """                 ### SEGMENT: LIVE REGION INTERACTION ###
+    set_live_region_interaction():
+    Attaches a live region interaction controller supplied by main.py."""
+
+    def set_live_region_interaction(self, interaction: LiveRegionInteraction | None):
+        self.region_interaction = interaction
+
+        if self.region_interaction is None:
+            self.unsetCursor()
+            self._set_mouse_passthrough(True)
+            self.update()
+            return
+
+        self._poll_region_hover()
+        self.update()
+
+    def clear_live_region_interaction(self):
+        self.set_live_region_interaction(None)
+
+    def _poll_region_hover(self):
+        if self.region_interaction is None:
+            return
+
+        if self.region_interaction.is_dragging:
+            self._set_mouse_passthrough(False)
+            return
+
+        pos = QCursor.pos()
+        hover = self.region_interaction.hover_at_screen_point(
+            int(pos.x()),
+            int(pos.y()),
+        )
+
+        if hover.has_target:
+            self._set_cursor_from_role(hover.cursor_role)
+            self._set_mouse_passthrough(False)
+        else:
+            self.unsetCursor()
+            self._set_mouse_passthrough(True)
+
+        self.update()
+
+    def _set_mouse_passthrough(self, enabled: bool):
+        if self._mouse_passthrough == enabled:
+            return
+
+        self._mouse_passthrough = enabled
+
+        self.setAttribute(Qt.WA_TransparentForMouseEvents, enabled)
+        self.setWindowFlag(Qt.WindowTransparentForInput, enabled)
+
+        # setWindowFlag can hide/recreate native window state on some platforms.
+        # show() restores the overlay without activating it.
+        self.show()
+
+    def _set_cursor_from_role(self, cursor_role: str):
+        cursor_map = {
+            "default": Qt.ArrowCursor,
+            "move": Qt.SizeAllCursor,
+            "resize_horizontal": Qt.SizeHorCursor,
+            "resize_vertical": Qt.SizeVerCursor,
+            "resize_diagonal_forward": Qt.SizeBDiagCursor,
+            "resize_diagonal_backward": Qt.SizeFDiagCursor,
+        }
+
+        self.setCursor(cursor_map.get(cursor_role, Qt.ArrowCursor))
+
+    def _global_point_from_event(self, event):
+        if hasattr(event, "globalPosition"):
+            return event.globalPosition().toPoint()
+
+        return event.globalPos()
+
+    def mousePressEvent(self, event):
+        if (
+            self.region_interaction is None
+            or event.button() != Qt.LeftButton
+        ):
+            super().mousePressEvent(event)
+            return
+
+        point = self._global_point_from_event(event)
+        drag = self.region_interaction.begin_drag_at_screen_point(
+            int(point.x()),
+            int(point.y()),
+        )
+
+        if drag is None:
+            super().mousePressEvent(event)
+            return
+
+        self._set_mouse_passthrough(False)
+        event.accept()
+        self.update()
+
+    def mouseMoveEvent(self, event):
+        if self.region_interaction is None:
+            super().mouseMoveEvent(event)
+            return
+
+        point = self._global_point_from_event(event)
+
+        if self.region_interaction.is_dragging:
+            self.region_interaction.drag_to_screen_point(
+                int(point.x()),
+                int(point.y()),
+            )
+            event.accept()
+            self.update()
+            return
+
+        hover = self.region_interaction.hover_at_screen_point(
+            int(point.x()),
+            int(point.y()),
+        )
+        self._set_cursor_from_role(hover.cursor_role)
+        event.accept()
+        self.update()
+
+    def mouseReleaseEvent(self, event):
+        if (
+            self.region_interaction is None
+            or event.button() != Qt.LeftButton
+            or not self.region_interaction.is_dragging
+        ):
+            super().mouseReleaseEvent(event)
+            return
+
+        result = self.region_interaction.finish_drag()
+
+        if result is not None:
+            self.region_edit_committed.emit(result)
+
+        event.accept()
+        self._poll_region_hover()
+        self.update()
+
+    def keyPressEvent(self, event):
+        if (
+            event.key() == Qt.Key_Escape
+            and self.region_interaction is not None
+            and self.region_interaction.is_dragging
+        ):
+            self.region_interaction.cancel_drag()
+            self._poll_region_hover()
+            event.accept()
+            self.update()
+            return
+
+        super().keyPressEvent(event)
 
     """                 ### SEGMENT: FRAME UPDATE ###
     update_frame():
     Updates the displayed overlay frame."""
-    
+
     def update_frame(self, frame_rgba: np.ndarray):
         """
         Accepts a numpy RGBA image of shape (h, w, 4), dtype uint8.
@@ -126,7 +304,72 @@ class overlay_window(QWidget):
 
         painter = QPainter(self)
         painter.drawImage(0, 0, image)
+        self._paint_region_interaction_preview(painter)
         painter.end()
+
+    def _paint_region_interaction_preview(self, painter):
+        if self.region_interaction is None:
+            return
+
+        state = self.region_interaction.get_preview_state()
+
+        capture_pen = QPen(QColor(116, 215, 196, 210))
+        capture_pen.setWidth(2)
+
+        roi_pen = QPen(QColor(255, 212, 121, 230))
+        roi_pen.setWidth(3)
+
+        hover_pen = QPen(QColor(255, 255, 255, 245))
+        hover_pen.setWidth(2)
+        hover_pen.setStyle(Qt.DashLine)
+
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        capture_rect = self._screen_rect_to_local_qrect(state.capture_rect)
+        painter.setPen(capture_pen)
+        painter.drawRect(capture_rect)
+
+        for key, rect in state.roi_rects.items():
+            local_rect = self._screen_rect_to_local_qrect(rect)
+
+            if key == state.hover.target_key:
+                painter.setPen(hover_pen)
+                painter.drawRect(local_rect.adjusted(-3, -3, 3, 3))
+
+            painter.setPen(roi_pen)
+            painter.drawRect(local_rect)
+
+            self._paint_resize_handles(painter, local_rect)
+
+    def _paint_resize_handles(self, painter, rect):
+        handle_size = 7
+        half = handle_size // 2
+
+        points = [
+            rect.topLeft(),
+            rect.topRight(),
+            rect.bottomLeft(),
+            rect.bottomRight(),
+        ]
+
+        for point in points:
+            painter.fillRect(
+                QRect(
+                    point.x() - half,
+                    point.y() - half,
+                    handle_size,
+                    handle_size,
+                ),
+                QColor(255, 255, 255, 230),
+            )
+
+    def _screen_rect_to_local_qrect(self, rect):
+        return QRect(
+            int(rect.x - self.left),
+            int(rect.y - self.top),
+            int(rect.width),
+            int(rect.height),
+        )
 
     def move_overlay(self, left: int, top: int):
         self.left = left
@@ -142,7 +385,7 @@ class overlay_window(QWidget):
     """              ### SEGMENT: GEOMETRY CONTROL ###
     set_overlay_geometry():
     Adjusts overlay position and size to match capture region."""
-    
+
     def set_overlay_geometry(self, left: int, top: int, width: int, height: int):
         self.left = left
         self.top = top
