@@ -554,6 +554,39 @@ class control_panel_ui:
 
         return row
 
+    def _apply_reward_action_visibility(self, action_type):
+        mouse_visible = action_type == "mouse_click"
+        keyboard_visible = action_type == "keyboard_shortcut"
+        command_visible = action_type == "shell_command"
+        webhook_visible = action_type == "webhook"
+
+        # Legacy flat mouse fields stay hidden.
+        # The dynamic click sequence is the active mouse-click UI.
+        self.reward_x_row.setVisible(False)
+        self.reward_y_row.setVisible(False)
+        self.reward_clicks_row.setVisible(mouse_visible)
+        self.reward_interval_row.setVisible(False)
+        self.reward_move_duration_row.setVisible(False)
+        self.reward_click_sequence_row.setVisible(mouse_visible)
+
+        self.reward_keys_row.setVisible(keyboard_visible)
+
+        self.reward_command_row.setVisible(command_visible)
+
+        self.reward_url_row.setVisible(webhook_visible)
+        self.reward_method_row.setVisible(webhook_visible)
+        self.reward_timeout_row.setVisible(webhook_visible)
+        self.reward_bearer_row.setVisible(webhook_visible)
+        self.reward_headers_row.setVisible(webhook_visible)
+        self.reward_payload_row.setVisible(webhook_visible)
+
+        return {
+            "mouse_visible": mouse_visible,
+            "keyboard_visible": keyboard_visible,
+            "command_visible": command_visible,
+            "webhook_visible": webhook_visible,
+        }
+
     def _make_click_sequence_step_row(self, index, step):
         row = QWidget()
         row.setObjectName("clickSequenceStep")
