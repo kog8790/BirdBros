@@ -517,6 +517,43 @@ class control_panel_ui:
         self.object_w.setValue(roi.width)
         self.object_h.setValue(roi.height)
 
+    def _make_reward_row(self, label_text, widget):
+        row = QWidget()
+        row_layout = QHBoxLayout(row)
+        row_layout.setContentsMargins(0, 0, 0, 0)
+        row_layout.setSpacing(8)
+
+        label = QLabel(label_text)
+        label.setObjectName("fieldLabel")
+        label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+
+        widget.setMinimumWidth(0)
+        widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
+        label.setMinimumWidth(92)
+        row_layout.addWidget(label, 0)
+        row_layout.addWidget(widget, 1)
+
+        return row
+
+    def _make_full_width_reward_row(self, label_text, widget):
+        row = QWidget()
+        row_layout = QVBoxLayout(row)
+        row_layout.setContentsMargins(0, 0, 0, 0)
+        row_layout.setSpacing(6)
+
+        label = QLabel(label_text)
+        label.setObjectName("fieldLabel")
+        label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+
+        widget.setMinimumWidth(0)
+        widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Maximum)
+
+        row_layout.addWidget(label)
+        row_layout.addWidget(widget)
+
+        return row
+
     def _make_click_sequence_step_row(self, index, step):
         row = QWidget()
         row.setObjectName("clickSequenceStep")

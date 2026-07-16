@@ -29,7 +29,6 @@ from PySide6.QtWidgets import (
     QWidget,
     QDialog,
     QVBoxLayout,
-    QHBoxLayout,
     QGridLayout,
     QFormLayout,
     QLabel,
@@ -701,43 +700,6 @@ class control_panel(QWidget, control_panel_ui):
         QTimer.singleShot(0, self._pin_to_screen_right_edge)
         QTimer.singleShot(100, self._pin_to_screen_right_edge)
         QTimer.singleShot(300, self._pin_to_screen_right_edge)
-
-    def _make_reward_row(self, label_text, widget):
-        row = QWidget()
-        row_layout = QHBoxLayout(row)
-        row_layout.setContentsMargins(0, 0, 0, 0)
-        row_layout.setSpacing(8)
-
-        label = QLabel(label_text)
-        label.setObjectName("fieldLabel")
-        label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-
-        widget.setMinimumWidth(0)
-        widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-
-        label.setMinimumWidth(92)
-        row_layout.addWidget(label, 0)
-        row_layout.addWidget(widget, 1)
-
-        return row
-
-    def _make_full_width_reward_row(self, label_text, widget):
-        row = QWidget()
-        row_layout = QVBoxLayout(row)
-        row_layout.setContentsMargins(0, 0, 0, 0)
-        row_layout.setSpacing(6)
-
-        label = QLabel(label_text)
-        label.setObjectName("fieldLabel")
-        label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-
-        widget.setMinimumWidth(0)
-        widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Maximum)
-
-        row_layout.addWidget(label)
-        row_layout.addWidget(widget)
-
-        return row
 
     def _capture_click_sequence_position(self, x_spin, y_spin):
         dialog = MousePositionCaptureDialog(self)
