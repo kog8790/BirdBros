@@ -81,6 +81,8 @@ class overlay_window(QWidget):
         self.region_interaction = None
         self._mouse_passthrough = True
         self._hover_poll_interval_ms = 33
+        self._hover_release_misses_required = 4
+        self._hover_release_misses = 0
         self._cursor_role = "default"
         self._using_override_cursor = False
 
@@ -92,8 +94,9 @@ class overlay_window(QWidget):
         # or while a region drag is in progress.
         self.setWindowFlags(
             Qt.Window |
+            Qt.Tool |
             Qt.FramelessWindowHint |
-            Qt.WindowTransparentForInput |
+            Qt.WindowStaysOnTopHint |
             Qt.WindowDoesNotAcceptFocus
         )
 
@@ -144,11 +147,16 @@ class overlay_window(QWidget):
         )
 
         if hover.has_target:
+            self._hover_release_misses = 0
             self._set_mouse_passthrough(False)
             self._set_cursor_from_role(hover.cursor_role)
         else:
-            self._clear_region_cursor()
-            self._set_mouse_passthrough(True)
+            self._hover_release_misses += 1
+
+            if self._hover_release_misses >= self._hover_release_misses_required:
+                self._hover_release_misses = 0
+                self._clear_region_cursor()
+                self._set_mouse_passthrough(True)
 
         self.update()
 
@@ -158,12 +166,10 @@ class overlay_window(QWidget):
 
         self._mouse_passthrough = enabled
 
+        # Experiment:
+        # Keep native window flags stable after show().
+        # Only toggle Qt-level mouse routing.
         self.setAttribute(Qt.WA_TransparentForMouseEvents, enabled)
-        self.setWindowFlag(Qt.WindowTransparentForInput, enabled)
-
-        # setWindowFlag can hide/recreate native window state on some platforms.
-        # show() restores the overlay without activating it.
-        self.show()
 
     def _set_cursor_from_role(self, cursor_role: str):
         cursor_map = {
@@ -256,6 +262,7 @@ class overlay_window(QWidget):
             super().mousePressEvent(event)
             return
 
+        self._hover_release_misses = 0
         self._set_mouse_passthrough(False)
         self._set_cursor_from_role(self.region_interaction.hover.cursor_role)
         event.accept()
