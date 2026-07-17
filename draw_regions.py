@@ -305,6 +305,9 @@ class LiveRegionInteraction:
     def is_dragging(self) -> bool:
         return self.drag is not None
 
+    def preview_roi_by_key(self, key: str) -> Optional[ROI]:
+        return self._preview_rois.get(key)
+
     def set_regions(
         self,
         capture_region: CaptureRegion,
@@ -348,12 +351,21 @@ class LiveRegionInteraction:
         self.hover = RegionHover()
         return self.hover
 
-    def begin_drag_at_screen_point(self, x: int, y: int) -> Optional[RegionDrag]:
+    def begin_drag_from_hover(
+        self,
+        hover: RegionHover,
+        x: int,
+        y: int,
+    ) -> Optional[RegionDrag]:
         """
-        Begin editing if the mouse is over an editable target.
+        Begin editing from a previously detected hover target.
+
+        This lets the overlay honor the resize cursor that was already shown
+        to the user instead of re-running hit detection on mouse press.
         """
 
-        hover = self.hover_at_screen_point(x, y)
+        if self.drag is not None:
+            return self.drag
 
         if not hover.has_target:
             return None
@@ -362,6 +374,7 @@ class LiveRegionInteraction:
         if region is None:
             return None
 
+        self.hover = hover
         self.drag = RegionDrag(
             target_key=region.key,
             handle=hover.handle,
@@ -369,6 +382,14 @@ class LiveRegionInteraction:
             original_rect=region.rect,
         )
         return self.drag
+
+    def begin_drag_at_screen_point(self, x: int, y: int) -> Optional[RegionDrag]:
+        """
+        Begin editing if the mouse is over an editable target.
+        """
+
+        hover = self.hover_at_screen_point(x, y)
+        return self.begin_drag_from_hover(hover, x, y)
 
     def drag_to_screen_point(self, x: int, y: int) -> Optional[RegionPreviewState]:
         """
@@ -535,6 +556,8 @@ class LiveRegionInteraction:
                     kind="roi",
                     roi=roi,
                     editable=roi.is_editable,
+                    movable=False,
+                    resizable=True,
                     bounds=capture_rect,
                 )
             )
@@ -544,6 +567,8 @@ class LiveRegionInteraction:
             label="Capture Region",
             rect=capture_rect,
             kind="capture",
+            movable=False,
+            resizable=True,
             bounds=None,
         )
 
@@ -574,6 +599,7 @@ class LiveRegionInteraction:
             point_y=y,
             rect=region.rect,
             edge_margin=self.edge_margin,
+            include_move=region.movable,
         )
 
         if handle == ResizeHandle.NONE:

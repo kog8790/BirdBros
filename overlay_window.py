@@ -231,10 +231,9 @@ class overlay_window(QWidget):
             "resize_diagonal_forward",
             "resize_diagonal_backward",
         }:
-            # AppKit does not expose public diagonal resize cursors.
-            # Use a visible native resize cursor rather than silently falling
-            # back to the normal arrow.
-            NSCursor.resizeLeftRightCursor().set()
+            # Qt provides diagonal resize cursors. AppKit does not expose
+            # public diagonal resize cursors, so do not override Qt's cursor
+            # with a horizontal native fallback here.
             return
 
         if cursor_role == "move":
@@ -455,18 +454,28 @@ class overlay_window(QWidget):
         self._paint_region_interaction_preview(painter)
         painter.end()
 
+    def _roi_preview_color_for_key(self, key):
+        if self.region_interaction is None:
+            return QColor(255, 255, 255, 230)
+
+        roi = self.region_interaction.preview_roi_by_key(key)
+
+        if roi is None:
+            return QColor(255, 255, 255, 230)
+
+        if roi.is_subject:
+            return QColor(0, 255, 0, 230)
+
+        if roi.is_trigger or roi.is_object:
+            return QColor(255, 0, 0, 230)
+
+        return QColor(255, 255, 255, 230)
+
     def _paint_region_interaction_preview(self, painter):
         if self.region_interaction is None:
             return
 
         state = self.region_interaction.get_preview_state()
-
-        roi_pen = QPen(QColor(255, 212, 121, 230))
-        roi_pen.setWidth(3)
-
-        hover_pen = QPen(QColor(255, 255, 255, 245))
-        hover_pen.setWidth(2)
-        hover_pen.setStyle(Qt.DashLine)
 
         painter.setRenderHint(QPainter.Antialiasing)
 
@@ -475,13 +484,20 @@ class overlay_window(QWidget):
         # actual overlay window geometry, not by a second painted rectangle.
         for key, rect in state.roi_rects.items():
             local_rect = self._screen_rect_to_local_qrect(rect)
+            roi_color = self._roi_preview_color_for_key(key)
 
-            if key == state.hover.target_key:
-                painter.setPen(hover_pen)
-                painter.drawRect(local_rect.adjusted(-3, -3, 3, 3))
+            roi_pen = QPen(roi_color)
+            roi_pen.setWidth(3)
 
             painter.setPen(roi_pen)
             painter.drawRect(local_rect)
+
+            if key == state.hover.target_key:
+                hover_pen = QPen(roi_color)
+                hover_pen.setWidth(2)
+                hover_pen.setStyle(Qt.DotLine)
+                painter.setPen(hover_pen)
+                painter.drawRect(local_rect.adjusted(-3, -3, 3, 3))
 
             self._paint_resize_handles(painter, local_rect)
 
