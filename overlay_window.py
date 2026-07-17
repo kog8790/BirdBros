@@ -38,6 +38,7 @@ from PySide6.QtGui import (
     QImage,
     QPainter,
     QPen,
+    QPixmap,
 )
 from PySide6.QtWidgets import QApplication, QWidget
 
@@ -46,9 +47,21 @@ from draw_regions import CAPTURE_TARGET_KEY, LiveRegionInteraction
 from mouse_tools import MouseHoverLock
 
 try:
-    from AppKit import NSCursor
+    from AppKit import (
+        NSBezierPath,
+        NSColor,
+        NSCursor,
+        NSImage,
+        NSMakePoint,
+        NSMakeSize,
+    )
 except Exception:
+    NSBezierPath = None
+    NSColor = None
     NSCursor = None
+    NSImage = None
+    NSMakePoint = None
+    NSMakeSize = None
 
 
 """                 ### SEGMENT: OVERLAY WINDOW CLASS ###
@@ -191,18 +204,58 @@ class overlay_window(QWidget):
         # Only toggle Qt-level mouse routing.
         self.setAttribute(Qt.WA_TransparentForMouseEvents, enabled)
 
-    def _set_cursor_from_role(self, cursor_role: str):
+    def _cursor_from_role(self, cursor_role: str):
         cursor_map = {
             "default": Qt.ArrowCursor,
             "move": Qt.SizeAllCursor,
             "resize_horizontal": Qt.SizeHorCursor,
             "resize_vertical": Qt.SizeVerCursor,
-            "resize_diagonal_forward": Qt.SizeBDiagCursor,
-            "resize_diagonal_backward": Qt.SizeFDiagCursor,
         }
 
-        cursor_shape = cursor_map.get(cursor_role, Qt.ArrowCursor)
-        cursor = QCursor(cursor_shape)
+        if cursor_role in {
+            "resize_diagonal_forward",
+            "resize_diagonal_backward",
+        }:
+            return QCursor(Qt.ArrowCursor)
+
+        return QCursor(cursor_map.get(cursor_role, Qt.ArrowCursor))
+
+    def _make_diagonal_resize_cursor(self, forward: bool):
+        size = 24
+        pixmap = QPixmap(size, size)
+        pixmap.fill(Qt.transparent)
+
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        pen = QPen(QColor(255, 255, 255, 245))
+        pen.setWidth(2)
+        painter.setPen(pen)
+
+        if forward:
+            start = 5, 19
+            end = 19, 5
+            arrow_a = [(19, 5), (13, 5), (19, 11)]
+            arrow_b = [(5, 19), (11, 19), (5, 13)]
+        else:
+            start = 5, 5
+            end = 19, 19
+            arrow_a = [(5, 5), (11, 5), (5, 11)]
+            arrow_b = [(19, 19), (13, 19), (19, 13)]
+
+        painter.drawLine(start[0], start[1], end[0], end[1])
+
+        painter.drawLine(arrow_a[0][0], arrow_a[0][1], arrow_a[1][0], arrow_a[1][1])
+        painter.drawLine(arrow_a[0][0], arrow_a[0][1], arrow_a[2][0], arrow_a[2][1])
+        painter.drawLine(arrow_b[0][0], arrow_b[0][1], arrow_b[1][0], arrow_b[1][1])
+        painter.drawLine(arrow_b[0][0], arrow_b[0][1], arrow_b[2][0], arrow_b[2][1])
+
+        painter.end()
+
+        return QCursor(pixmap, size // 2, size // 2)
+
+    def _set_cursor_from_role(self, cursor_role: str):
+        cursor = self._cursor_from_role(cursor_role)
 
         self.setCursor(cursor)
 
@@ -214,6 +267,62 @@ class overlay_window(QWidget):
 
         self._set_native_cursor_from_role(cursor_role)
         self._cursor_role = cursor_role
+
+    def _make_native_diagonal_resize_cursor(self, forward: bool):
+        if (
+            NSCursor is None
+            or NSImage is None
+            or NSBezierPath is None
+            or NSColor is None
+            or NSMakePoint is None
+            or NSMakeSize is None
+        ):
+            return None
+
+        size = 24
+        image = NSImage.alloc().initWithSize_(NSMakeSize(size, size))
+        image.lockFocus()
+
+        NSColor.clearColor().set()
+        NSBezierPath.fillRect_(((0, 0), (size, size)))
+
+        NSColor.whiteColor().set()
+        path = NSBezierPath.bezierPath()
+        path.setLineWidth_(2.2)
+
+        if forward:
+            start = NSMakePoint(5, 5)
+            end = NSMakePoint(19, 19)
+            arrow_points = [
+                (NSMakePoint(19, 19), NSMakePoint(13, 19)),
+                (NSMakePoint(19, 19), NSMakePoint(19, 13)),
+                (NSMakePoint(5, 5), NSMakePoint(11, 5)),
+                (NSMakePoint(5, 5), NSMakePoint(5, 11)),
+            ]
+        else:
+            start = NSMakePoint(5, 19)
+            end = NSMakePoint(19, 5)
+            arrow_points = [
+                (NSMakePoint(19, 5), NSMakePoint(13, 5)),
+                (NSMakePoint(19, 5), NSMakePoint(19, 11)),
+                (NSMakePoint(5, 19), NSMakePoint(11, 19)),
+                (NSMakePoint(5, 19), NSMakePoint(5, 13)),
+            ]
+
+        path.moveToPoint_(start)
+        path.lineToPoint_(end)
+
+        for arrow_start, arrow_end in arrow_points:
+            path.moveToPoint_(arrow_start)
+            path.lineToPoint_(arrow_end)
+
+        path.stroke()
+        image.unlockFocus()
+
+        return NSCursor.alloc().initWithImage_hotSpot_(
+            image,
+            NSMakePoint(size / 2, size / 2),
+        )
 
     def _set_native_cursor_from_role(self, cursor_role: str):
         if NSCursor is None:
@@ -227,13 +336,16 @@ class overlay_window(QWidget):
             NSCursor.resizeUpDownCursor().set()
             return
 
-        if cursor_role in {
-            "resize_diagonal_forward",
-            "resize_diagonal_backward",
-        }:
-            # Qt provides diagonal resize cursors. AppKit does not expose
-            # public diagonal resize cursors, so do not override Qt's cursor
-            # with a horizontal native fallback here.
+        if cursor_role == "resize_diagonal_forward":
+            cursor = self._make_native_diagonal_resize_cursor(forward=True)
+            if cursor is not None:
+                cursor.set()
+            return
+
+        if cursor_role == "resize_diagonal_backward":
+            cursor = self._make_native_diagonal_resize_cursor(forward=False)
+            if cursor is not None:
+                cursor.set()
             return
 
         if cursor_role == "move":
