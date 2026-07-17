@@ -155,14 +155,14 @@ def main():
 
     def build_overlay_region_interaction(active_config):
         active_capture_region = CaptureRegion.from_config(active_config)
-        active_object_roi = ROI.trigger_object_from_percent_config(
+        active_rois = ROI.editable_rois_from_config(
             config=active_config,
             capture_region=active_capture_region,
         )
 
         return LiveRegionInteraction(
             capture_region=active_capture_region,
-            rois=[active_object_roi],
+            rois=active_rois,
         )
 
     def refresh_overlay_region_interaction():
@@ -171,22 +171,18 @@ def main():
         )
 
     def on_overlay_region_edit_committed(result):
-        object_roi = result.rois.get("object_roi")
-
         capture_region = None
         if result.changed_key == "capture_region":
             capture_region = result.capture_region
 
         panel.apply_live_region_edit(
             capture_region=capture_region,
-            object_roi=object_roi,
+            rois=result.rois,
         )
 
-        object_roi_config = None
-        if object_roi is not None:
-            object_roi_config = object_roi.to_percent_config(
-                result.capture_region
-            )
+        roi_configs = {}
+        for key, roi in result.rois.items():
+            roi_configs[key] = roi.to_percent_config(result.capture_region)
 
         logger.log_info(
             "Overlay region edit committed through control panel",
@@ -196,7 +192,7 @@ def main():
                 if capture_region is not None
                 else None
             ),
-            object_roi=object_roi_config,
+            rois=roi_configs,
         )
 
     overlay.region_edit_committed.connect(on_overlay_region_edit_committed)
@@ -254,6 +250,7 @@ def main():
     prev_region = region.copy()
     prev_video_config = video_config.copy()
     prev_motion_min_area = motion_min_area
+    prev_behavior_mode = current_config.get("behavior_mode", "simple")
     prev_subject_roi = current_config["subject_roi"].copy()
     prev_object_roi = current_config["object_roi"].copy()
     prev_task_labels = current_config.get("task_labels", {}).copy()
@@ -464,6 +461,7 @@ def main():
 
             region = current_config["capture_region"].copy()
             motion_min_area = current_config["motion"]["min_area"]
+            behavior_mode = current_config.get("behavior_mode", "simple")
             task_labels = current_config.get("task_labels", {})
 
             show_overlay = get_display_bool(current_config, "show_overlay", True)
@@ -513,19 +511,30 @@ def main():
                 logger.log_info("Motion sensitivity updated", min_area=motion_min_area)
                 prev_motion_min_area = motion_min_area
 
+            behavior_mode_changed = behavior_mode != prev_behavior_mode
+
             roi_changed = (
                 current_subject_roi != prev_subject_roi
                 or current_object_roi != prev_object_roi
             )
 
-            if roi_changed:
+            if behavior_mode_changed or roi_changed:
                 reset_runtime_state(
                     event_text="ROI Changed",
-                    storyboard_abort_note="Storyboard aborted because ROI changed during event."
+                    storyboard_abort_note=(
+                        "Storyboard aborted because behavior mode or ROI changed during event."
+                    )
                 )
 
-                logger.log_info("ROI updated", subject_roi=current_subject_roi, object_roi=current_object_roi)
+                logger.log_info(
+                    "ROI interaction model updated",
+                    behavior_mode=behavior_mode,
+                    previous_behavior_mode=prev_behavior_mode,
+                    subject_roi=current_subject_roi,
+                    object_roi=current_object_roi,
+                )
                 refresh_overlay_region_interaction()
+                prev_behavior_mode = behavior_mode
                 prev_subject_roi = current_subject_roi.copy()
                 prev_object_roi = current_object_roi.copy()
 
