@@ -48,7 +48,6 @@ from PySide6.QtWidgets import (
 from config_manager import DEFAULT_CONFIG, load_config, save_config
 from control_panel_ui import control_panel_ui
 from capture_regions import CaptureRegion
-from draw_regions import RegionDragCaptureDialog
 from roi_regions import ROI
 from macos_permissions import (
     accessibility_trusted,
@@ -446,8 +445,6 @@ class control_panel(QWidget, control_panel_ui):
         button_grid.setSpacing(8)
 
         self.start_pause_button = QPushButton("Start Detection")
-        self.draw_capture_button = QPushButton("Draw Capture")
-        self.draw_trigger_button = QPushButton("Draw Trigger")
         self.save_button = QPushButton("Save")
         self.reload_button = QPushButton("Reload")
         self.reset_button = QPushButton("Reset")
@@ -456,8 +453,6 @@ class control_panel(QWidget, control_panel_ui):
 
         for button in [
             self.start_pause_button,
-            self.draw_capture_button,
-            self.draw_trigger_button,
             self.save_button,
             self.reload_button,
             self.reset_button,
@@ -469,21 +464,17 @@ class control_panel(QWidget, control_panel_ui):
 
         self.start_pause_button.setObjectName("primaryButton")
         self.exit_button.setObjectName("dangerButton")
-        self.draw_capture_button.setObjectName("secondaryButton")
-        self.draw_trigger_button.setObjectName("secondaryButton")
         self.save_button.setObjectName("secondaryButton")
         self.reload_button.setObjectName("secondaryButton")
         self.reset_button.setObjectName("secondaryButton")
         self.manual_capture_button.setObjectName("secondaryButton")
 
         button_grid.addWidget(self.start_pause_button, 0, 0, 1, 2)
-        button_grid.addWidget(self.draw_capture_button, 1, 0)
-        button_grid.addWidget(self.draw_trigger_button, 1, 1)
-        button_grid.addWidget(self.save_button, 2, 0)
-        button_grid.addWidget(self.reload_button, 2, 1)
-        button_grid.addWidget(self.manual_capture_button, 3, 0)
-        button_grid.addWidget(self.reset_button, 3, 1)
-        button_grid.addWidget(self.exit_button, 4, 0, 1, 2)
+        button_grid.addWidget(self.save_button, 1, 0)
+        button_grid.addWidget(self.reload_button, 1, 1)
+        button_grid.addWidget(self.manual_capture_button, 2, 0)
+        button_grid.addWidget(self.reset_button, 2, 1)
+        button_grid.addWidget(self.exit_button, 3, 0, 1, 2)
 
         button_grid.setColumnStretch(0, 1)
         button_grid.setColumnStretch(1, 1)
@@ -635,8 +626,6 @@ class control_panel(QWidget, control_panel_ui):
             widget.textChanged.connect(self._on_widget_changed)
 
         self.start_pause_button.clicked.connect(self._on_start_pause_clicked)
-        self.draw_capture_button.clicked.connect(self._on_draw_capture_region_clicked)
-        self.draw_trigger_button.clicked.connect(self._on_draw_trigger_roi_clicked)
         self.save_button.clicked.connect(self.save_config)
         self.reload_button.clicked.connect(self.reload_config)
         self.reset_button.clicked.connect(self.reset_defaults)
@@ -912,59 +901,6 @@ class control_panel(QWidget, control_panel_ui):
             width=self.capture_width.value(),
             height=self.capture_height.value(),
         )
-
-    def _on_draw_capture_region_clicked(self):
-        dialog = RegionDragCaptureDialog(
-            title="Draw Capture Region",
-            instructions=(
-                "Draw the full screen area BirdBros should analyze.\n"
-                "This sets Capture Region: Left, Top, Width, and Height."
-            ),
-            parent=self
-        )
-
-        if dialog.exec() != QDialog.Accepted or dialog.selected_rect is None:
-            return
-
-        capture_region = CaptureRegion.from_screen_tuple(dialog.selected_rect)
-
-        self._apply_capture_region_to_fields(capture_region)
-
-        self.status_label.setText("Capture region updated")
-        self._on_widget_changed()
-
-    def _on_draw_trigger_roi_clicked(self):
-        capture_region = self._current_capture_region()
-
-        if capture_region.width <= 0 or capture_region.height <= 0:
-            QMessageBox.warning(
-                self,
-                "Capture Region Required",
-                "Set a valid Capture Region before drawing the Trigger ROI."
-            )
-            return
-
-        dialog = RegionDragCaptureDialog(
-            title="Draw Trigger ROI",
-            instructions=(
-                "Draw the trigger/drop zone inside the current Capture Region.\n"
-                "This sets Trigger ROI: X, Y, W, and H relative to the Capture Region."
-            ),
-            parent=self
-        )
-
-        if dialog.exec() != QDialog.Accepted or dialog.selected_rect is None:
-            return
-
-        trigger_roi = ROI.trigger_object_from_screen_tuple(
-            rect_tuple=dialog.selected_rect,
-            capture_region=capture_region,
-        )
-
-        self._apply_object_roi_to_fields(trigger_roi)
-
-        self.status_label.setText("Trigger ROI updated")
-        self._on_widget_changed()
 
     def apply_live_region_edit(self, capture_region=None, object_roi=None, subject_roi=None):
         widgets = [
