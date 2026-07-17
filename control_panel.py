@@ -509,59 +509,53 @@ class control_panel(QWidget, control_panel_ui):
         main_layout.addWidget(task_group)
         main_layout.addWidget(reward_group)
 
-        main_layout.addWidget(
-            self._make_collapsible_section(
-                "Display Options",
-                display_group,
-                expanded=False,
-                icon_text="EYE"
-            )
+        self.display_options_section = self._make_collapsible_section(
+            "Display Options",
+            display_group,
+            expanded=False,
+            icon_text="EYE"
         )
+        main_layout.addWidget(self.display_options_section)
 
-        main_layout.addWidget(
-            self._make_collapsible_section(
-                "Capture Region",
-                capture_group,
-                expanded=False,
-                icon_text="CAP"
-            )
+        self.capture_region_section = self._make_collapsible_section(
+            "Capture Region",
+            capture_group,
+            expanded=False,
+            icon_text="CAP"
         )
+        main_layout.addWidget(self.capture_region_section)
 
-        main_layout.addWidget(
-            self._make_collapsible_section(
-                "Video Input",
-                video_group,
-                expanded=False,
-                icon_text="VID"
-            )
+        self.video_input_section = self._make_collapsible_section(
+            "Video Input",
+            video_group,
+            expanded=False,
+            icon_text="VID"
         )
+        main_layout.addWidget(self.video_input_section)
 
-        main_layout.addWidget(
-            self._make_collapsible_section(
-                "Trigger ROI",
-                self.object_group,
-                expanded=False,
-                icon_text="ROI"
-            )
+        self.object_roi_section = self._make_collapsible_section(
+            "Trigger ROI",
+            self.object_group,
+            expanded=False,
+            icon_text="ROI"
         )
+        main_layout.addWidget(self.object_roi_section)
 
-        main_layout.addWidget(
-            self._make_collapsible_section(
-                "Subject ROI",
-                self.subject_group,
-                expanded=False,
-                icon_text="SUB"
-            )
+        self.subject_roi_section = self._make_collapsible_section(
+            "Subject ROI",
+            self.subject_group,
+            expanded=False,
+            icon_text="SUB"
         )
+        main_layout.addWidget(self.subject_roi_section)
 
-        main_layout.addWidget(
-            self._make_collapsible_section(
-                "Motion",
-                motion_group,
-                expanded=False,
-                icon_text="MTN"
-            )
+        self.motion_section = self._make_collapsible_section(
+            "Motion",
+            motion_group,
+            expanded=False,
+            icon_text="MTN"
         )
+        main_layout.addWidget(self.motion_section)
 
         main_layout.addLayout(button_grid)
         main_layout.addWidget(self.status_label)

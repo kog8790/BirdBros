@@ -588,7 +588,26 @@ class control_panel_ui:
         }
 
     def _apply_behavior_mode_visibility(self, mode):
-        advanced_visible = mode == "advanced"
+        behavior_mode_profiles = {
+            "simple": {
+                "advanced_visible": False,
+                "coordinate_sections_visible": False,
+                "object_group_title": "Trigger ROI",
+            },
+            "advanced": {
+                "advanced_visible": True,
+                "coordinate_sections_visible": True,
+                "object_group_title": "Object ROI",
+            },
+        }
+
+        profile = behavior_mode_profiles.get(
+            mode,
+            behavior_mode_profiles["simple"]
+        )
+
+        advanced_visible = profile["advanced_visible"]
+        coordinate_sections_visible = profile["coordinate_sections_visible"]
 
         self.subject_label_widget.setVisible(advanced_visible)
         self.subject_label.setVisible(advanced_visible)
@@ -602,15 +621,16 @@ class control_panel_ui:
         self.action_label_widget.setVisible(advanced_visible)
         self.action_label.setVisible(advanced_visible)
 
-        self.subject_group.setVisible(advanced_visible)
+        self.capture_region_section.setVisible(coordinate_sections_visible)
+        self.object_roi_section.setVisible(coordinate_sections_visible)
+        self.subject_roi_section.setVisible(coordinate_sections_visible)
 
-        if advanced_visible:
-            self.object_group.setTitle("Object ROI")
-        else:
-            self.object_group.setTitle("Trigger ROI")
+        self.subject_group.setVisible(advanced_visible)
+        self.object_group.setTitle(profile["object_group_title"])
 
         return {
             "advanced_visible": advanced_visible,
+            "coordinate_sections_visible": coordinate_sections_visible,
         }
 
     def _apply_video_input_visibility(self, input_mode):
