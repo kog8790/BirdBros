@@ -26,6 +26,7 @@ Separate visualization from processing so the system can run headless or with UI
 """
 
 import sys
+from time import monotonic
 
 import cv2
 import numpy as np
@@ -40,7 +41,9 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import QApplication, QWidget
 
+from capture_regions import CaptureRegion
 from draw_regions import CAPTURE_TARGET_KEY, LiveRegionInteraction
+from mouse_tools import MouseHoverLock
 
 try:
     from AppKit import NSCursor
@@ -75,6 +78,7 @@ class overlay_window(QWidget):
         self.top = top
         self.width_value = width
         self.height_value = height
+        self._interaction_padding = 0
 
         self.overlay_frame = np.zeros((height, width, 4), dtype=np.uint8)
 
@@ -83,11 +87,13 @@ class overlay_window(QWidget):
         self._hover_poll_interval_ms = 33
         self._hover_release_misses_required = 4
         self._hover_release_misses = 0
+        self._hover_lock_duration_s = 0.25
+        self._hover_lock = None
         self._cursor_role = "default"
         self._using_override_cursor = False
 
         self.setWindowTitle("Bird Bros Overlay")
-        self.setGeometry(QRect(self.left, self.top, self.width_value, self.height_value))
+        self._apply_native_overlay_geometry()
 
         # The overlay starts as a visual guide, not a control surface.
         # It becomes interactive only while the cursor is near an editable region
@@ -121,6 +127,7 @@ class overlay_window(QWidget):
         self.region_interaction = interaction
 
         if self.region_interaction is None:
+            self._hover_lock = None
             self._clear_region_cursor()
             self._set_mouse_passthrough(True)
             self.update()
@@ -146,11 +153,24 @@ class overlay_window(QWidget):
             int(pos.y()),
         )
 
+        now = monotonic()
+
         if hover.has_target:
             self._hover_release_misses = 0
+            self._hover_lock = MouseHoverLock.create(
+                payload=hover,
+                now=now,
+                duration_s=self._hover_lock_duration_s,
+            )
             self._set_mouse_passthrough(False)
             self._set_cursor_from_role(hover.cursor_role)
         else:
+            if self._hover_lock is not None and self._hover_lock.is_valid(now):
+                self._set_mouse_passthrough(False)
+                self.update()
+                return
+
+            self._hover_lock = None
             self._hover_release_misses += 1
 
             if self._hover_release_misses >= self._hover_release_misses_required:
@@ -253,15 +273,29 @@ class overlay_window(QWidget):
             return
 
         point = self._global_point_from_event(event)
-        drag = self.region_interaction.begin_drag_at_screen_point(
-            int(point.x()),
-            int(point.y()),
-        )
+        x = int(point.x())
+        y = int(point.y())
+
+        now = monotonic()
+        locked_hover = None
+
+        if self._hover_lock is not None and self._hover_lock.is_valid(now):
+            locked_hover = self._hover_lock.payload
+
+        if locked_hover is not None and locked_hover.has_target:
+            drag = self.region_interaction.begin_drag_from_hover(
+                locked_hover,
+                x,
+                y,
+            )
+        else:
+            drag = self.region_interaction.begin_drag_at_screen_point(x, y)
 
         if drag is None:
             super().mousePressEvent(event)
             return
 
+        self._hover_lock = None
         self._hover_release_misses = 0
         self._set_mouse_passthrough(False)
         self._set_cursor_from_role(self.region_interaction.hover.cursor_role)
@@ -413,7 +447,11 @@ class overlay_window(QWidget):
         )
 
         painter = QPainter(self)
-        painter.drawImage(0, 0, image)
+        painter.drawImage(
+            self._interaction_padding,
+            self._interaction_padding,
+            image,
+        )
         self._paint_region_interaction_preview(painter)
         painter.end()
 
@@ -471,26 +509,57 @@ class overlay_window(QWidget):
 
     def _screen_rect_to_local_qrect(self, rect):
         return QRect(
-            int(rect.x - self.left),
-            int(rect.y - self.top),
+            int(rect.x - self.left + self._interaction_padding),
+            int(rect.y - self.top + self._interaction_padding),
             int(rect.width),
             int(rect.height),
         )
 
     def move_overlay(self, left: int, top: int):
-        self.left = left
-        self.top = top
-        self.move(self.left, self.top)
+        self.set_overlay_geometry(
+            left=left,
+            top=top,
+            width=self.width_value,
+            height=self.height_value,
+        )
 
     def resize_overlay(self, width: int, height: int):
-        self.width_value = width
-        self.height_value = height
-        self.overlay_frame = np.zeros((height, width, 4), dtype=np.uint8)
-        self.resize(width, height)
+        self.set_overlay_geometry(
+            left=self.left,
+            top=self.top,
+            width=width,
+            height=height,
+        )
+
+    def _current_capture_region(self) -> CaptureRegion:
+        return CaptureRegion(
+            left=int(self.left),
+            top=int(self.top),
+            width=int(self.width_value),
+            height=int(self.height_value),
+        )
+
+    def _apply_native_overlay_geometry(self):
+        capture_region = self._current_capture_region()
+        self._interaction_padding = capture_region.interaction_padding_px()
+
+        expanded_region = capture_region.expanded_for_interaction()
+        self.setGeometry(
+            QRect(
+                int(expanded_region.left),
+                int(expanded_region.top),
+                int(expanded_region.width),
+                int(expanded_region.height),
+            )
+        )
 
     """              ### SEGMENT: GEOMETRY CONTROL ###
     set_overlay_geometry():
-    Adjusts overlay position and size to match capture region."""
+    Adjusts overlay position and size to match capture region.
+
+    The visible Capture Region remains left/top/width/height. The native
+    QWidget is expanded invisibly around it so outside-edge resize grabs can
+    still be delivered to BirdBros."""
 
     def set_overlay_geometry(self, left: int, top: int, width: int, height: int):
         self.left = left
@@ -498,7 +567,7 @@ class overlay_window(QWidget):
         self.width_value = width
         self.height_value = height
         self.overlay_frame = np.zeros((height, width, 4), dtype=np.uint8)
-        self.setGeometry(QRect(left, top, width, height))
+        self._apply_native_overlay_geometry()
 
 """             ### SEGMENT: APPLICATION CONTEXT ###
 get_or_create_qt_app():

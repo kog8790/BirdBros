@@ -36,6 +36,46 @@ class CaptureRegion:
     def local_to_screen(self, x: int, y: int) -> Tuple[int, int]:
         return (int(self.left + x), int(self.top + y))
 
+    def interaction_padding_px(
+        self,
+        ratio: float = 0.02,
+        min_px: int = 8,
+        max_px: int = 28,
+    ) -> int:
+        """
+        Derive invisible interaction padding from Capture Region size.
+
+        The percentage is the source of truth; min/max are guardrails so tiny
+        regions remain usable and very large regions do not create an overly
+        grabby invisible border.
+        """
+
+        base_dimension = max(1, min(int(self.width), int(self.height)))
+        derived_padding = int(round(base_dimension * ratio))
+
+        return max(int(min_px), min(int(derived_padding), int(max_px)))
+
+    def expanded_for_interaction(
+        self,
+        ratio: float = 0.02,
+        min_px: int = 8,
+        max_px: int = 28,
+    ) -> "CaptureRegion":
+        padding = self.interaction_padding_px(
+            ratio=ratio,
+            min_px=min_px,
+            max_px=max_px,
+        )
+
+        return CaptureRegion(
+            left=int(self.left - padding),
+            top=int(self.top - padding),
+            width=int(self.width + padding * 2),
+            height=int(self.height + padding * 2),
+            min_width=self.min_width,
+            min_height=self.min_height,
+        )
+
     @classmethod
     def from_config(cls, config: dict) -> "CaptureRegion":
         region = config.get("capture_region", {})
